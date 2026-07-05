@@ -28,4 +28,18 @@ python3 -m venv .venv && .venv/bin/pip install -r requirements.txt
 .venv/bin/pytest -q
 ```
 
+## 검증 벤치마크
+
+Ø6.5 mm 수평 원통 · 8500 W/m²(0.85 W/cm²) · ε0.95 · 25 °C 를 GUI/코어로 실행하면:
+
+| 항목 | 결과 | 기준 |
+|---|---|---|
+| 표면 평균온도 | **264.4 °C** | 265 °C (±10 %) ✓ |
+| 표면 최고온도 | 306 °C | 상단 최고 ✓ |
+| 복사 비중 | 47.6 % | ≈48 % ✓ |
+| 에너지 평형 | 대류 4453 + 복사 4047 = 8500 W/m² | <1 % ✓ |
+
+Mac(ESI v2606)에서 검증된 `tutorial_1` 결과와 일치.
+
 설계·계획: `docs/superpowers/specs/`, `docs/superpowers/plans/`.
+사무실(WSL) 이식: 상위 폴더의 `사무실_WSL_natconv-studio_구축_프롬프트.md`.

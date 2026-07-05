@@ -20,7 +20,8 @@ def _pipeline(env):
         ("surfaceFeatureExtract", "surfaceFeatureExtract"),
         ("snappyHexMesh", "snappyHexMesh -overwrite"),
         ("checkMesh", "checkMesh"),
-        ("decomposePar", "cp -r 0.orig 0 && decomposePar -force"),
+        # snappyHexMesh가 0/ 를 생성하므로 반드시 제거 후 초기장 복원(중첩 복사 방지)
+        ("decomposePar", "rm -rf 0 && cp -r 0.orig 0 && decomposePar -force"),
         ("solver", f"mpirun -np {nprocs} {solver} -parallel"),
         ("reconstructPar", "reconstructPar -latestTime"),
         ("cellCentres", "postProcess -func writeCellCentres -latestTime"),
