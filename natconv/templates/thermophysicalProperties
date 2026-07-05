@@ -1,0 +1,46 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+| 냉장고 제상 히터 표면온도 해석 - 공기 물성                                   |
+| ΔT가 크므로(25->~280 C) 밀도는 perfectGas, 점성은 Sutherland(온도의존)로.   |
+\*---------------------------------------------------------------------------*/
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       dictionary;
+    object      thermophysicalProperties;
+}
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+thermoType
+{
+    type            heRhoThermo;
+    mixture         pureMixture;
+    transport       sutherland;
+    thermo          hConst;
+    equationOfState perfectGas;
+    specie          specie;
+    energy          sensibleEnthalpy;
+}
+
+pRef            1e5;
+
+mixture
+{
+    specie
+    {
+        molWeight       28.96;
+    }
+    thermodynamics
+    {
+        Cp              1005;
+        Hf              0;
+    }
+    transport
+    {
+        // 공기 Sutherland: mu = As*sqrt(T)/(1 + Ts/T)
+        As              1.458e-06;
+        Ts              110.4;
+    }
+}
+
+// ************************************************************************* //

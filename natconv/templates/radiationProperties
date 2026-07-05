@@ -1,0 +1,42 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+| 냉장고 제상 히터 표면온도 해석 - 복사 (fvDOM)                                |
+| 공기는 투명(흡수/방출 0)으로 두어 표면-표면 복사만 전달.                     |
+\*---------------------------------------------------------------------------*/
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       dictionary;
+    object      radiationProperties;
+}
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+radiation       on;
+
+radiationModel  fvDOM;
+
+fvDOMCoeffs
+{
+    nPhi        3;      // 방위각 분할 (0->pi)
+    nTheta      5;      // 천정각 분할 (0->pi)
+    tolerance   1e-3;
+    maxIter     10;
+}
+
+// 유동 반복 몇 회당 복사 1회
+solverFreq      10;
+
+absorptionEmissionModel constantAbsorptionEmission;
+
+constantAbsorptionEmissionCoeffs
+{
+    absorptivity    absorptivity    [ m^-1 ] 0.0;   // 공기 투명
+    emissivity      emissivity      [ m^-1 ] 0.0;
+    E               E               [ kg m^-1 s^-3 ] 0;
+}
+
+scatterModel    none;
+
+sootModel       none;
+
+// ************************************************************************* //

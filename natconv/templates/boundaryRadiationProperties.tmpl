@@ -1,0 +1,28 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+| 냉장고 제상 히터 표면온도 해석 - 경계 방사율                                 |
+\*---------------------------------------------------------------------------*/
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       dictionary;
+    object      boundaryRadiationProperties;
+}
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+heater
+{
+    type            lookup;
+    emissivity      __EMISSIVITY__;   // Incoloy 시스 (산화표면) 가정
+    absorptivity    __EMISSIVITY__;
+}
+
+farfield
+{
+    // 원방 경계: 25 C 흑체 흡수 (복사 싱크)
+    type            lookup;
+    emissivity      1.0;
+    absorptivity    1.0;
+}
+
+// ************************************************************************* //

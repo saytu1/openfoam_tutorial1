@@ -1,0 +1,33 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+| 냉장고 제상 히터 표면온도 해석 - p_rgh (= p - rho*g*h)                       |
+\*---------------------------------------------------------------------------*/
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       volScalarField;
+    object      p_rgh;
+}
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+dimensions      [1 -1 -2 0 0 0 0];
+
+internalField   uniform 1e5;
+
+boundaryField
+{
+    heater
+    {
+        type            fixedFluxPressure;
+        value           uniform 1e5;
+    }
+
+    farfield
+    {
+        // 밀폐 인클로저 벽
+        type            fixedFluxPressure;
+        value           uniform 1e5;
+    }
+}
+
+// ************************************************************************* //

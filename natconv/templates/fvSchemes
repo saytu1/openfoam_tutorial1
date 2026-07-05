@@ -1,0 +1,53 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+| 냉장고 제상 히터 표면온도 해석 - 이산화 스킴 (정상상태, 층류)               |
+\*---------------------------------------------------------------------------*/
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       dictionary;
+    object      fvSchemes;
+}
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+ddtSchemes
+{
+    default         steadyState;
+}
+
+gradSchemes
+{
+    default         Gauss linear;
+}
+
+divSchemes
+{
+    default         none;
+
+    // 2차 정확도(수치확산 저감) — 자연대류 플룸/경계층 정확도에 중요
+    div(phi,U)      bounded Gauss linearUpwindV grad(U);
+
+    energy          bounded Gauss limitedLinear 1;
+    div(phi,K)      $energy;
+    div(phi,h)      $energy;
+
+    div(Ji,Ii_h)    bounded Gauss linearUpwind grad(Ii_h);
+    div(((rho*nuEff)*dev2(T(grad(U))))) Gauss linear;
+}
+
+laplacianSchemes
+{
+    default         Gauss linear corrected;
+}
+
+interpolationSchemes
+{
+    default         linear;
+}
+
+snGradSchemes
+{
+    default         corrected;
+}
+
+// ************************************************************************* //
