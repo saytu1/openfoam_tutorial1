@@ -1,0 +1,8 @@
+Time = 50
+    areaAverage(heater) of T = 451.16
+    max(heater) of T = 508.6
+    areaAverage(heater) of qr = -1794.0
+Time = 100
+    areaAverage(heater) of T = 491.37
+    max(heater) of T = 543.2
+    areaAverage(heater) of qr = -2639.0
