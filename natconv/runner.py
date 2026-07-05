@@ -23,6 +23,7 @@ def _pipeline(env):
         ("decomposePar", "cp -r 0.orig 0 && decomposePar -force"),
         ("solver", f"mpirun -np {nprocs} {solver} -parallel"),
         ("reconstructPar", "reconstructPar -latestTime"),
+        ("cellCentres", "postProcess -func writeCellCentres -latestTime"),
     ]
 
 
