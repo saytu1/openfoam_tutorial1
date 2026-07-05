@@ -1,0 +1,9 @@
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# 생성 케이스·결과 (대용량)
+cases/
+*.foam
