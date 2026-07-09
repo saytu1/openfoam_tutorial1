@@ -1,0 +1,111 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+| 냉장고 제상 히터 표면온도 해석 - 실행 제어 및 결과 추출                      |
+\*---------------------------------------------------------------------------*/
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       dictionary;
+    object      controlDict;
+}
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+application     __SOLVER__;
+
+startFrom       latestTime;
+startTime       0;
+stopAt          endTime;
+endTime         __END_TIME__;         // 상한 (residualControl 수렴 시 조기 종료)
+deltaT          1;
+
+writeControl    timeStep;
+writeInterval   500;
+purgeWrite      3;
+
+writeFormat     ascii;
+writePrecision  7;
+writeCompression off;
+timeFormat      general;
+timePrecision   6;
+runTimeModifiable true;
+
+functions
+{
+    // 히터 축(z)에 수직인 단면 온도장 추출 (원형 단면)
+    cutPlane
+    {
+        type            surfaces;
+        libs            (sampling);
+        interpolationScheme cellPoint;
+        surfaceFormat   vtk;
+        writeControl    writeTime;
+        fields          (T);
+        surfaces
+        {
+            zMid
+            {
+                type        cuttingPlane;
+                point       (0 0 0);
+                normal      (0 0 1);
+                interpolate true;
+            }
+        }
+    }
+
+    // 히터 표면 평균 온도
+    heaterTavg
+    {
+        type            surfaceFieldValue;
+        libs            (fieldFunctionObjects);
+        regionType      patch;
+        name            heater;
+        operation       areaAverage;
+        fields          (T);
+        writeFields     false;
+        writeControl    timeStep;
+        writeInterval   50;
+        log             true;
+    }
+
+    // 히터 표면 최고 온도
+    heaterTmax
+    {
+        type            surfaceFieldValue;
+        libs            (fieldFunctionObjects);
+        regionType      patch;
+        name            heater;
+        operation       max;
+        fields          (T);
+        writeFields     false;
+        writeControl    timeStep;
+        writeInterval   50;
+        log             true;
+    }
+
+    // 히터 표면 평균 복사 열유속 qr [W/m^2]
+    heaterQr
+    {
+        type            surfaceFieldValue;
+        libs            (fieldFunctionObjects);
+        regionType      patch;
+        name            heater;
+        operation       areaAverage;
+        fields          (qr);
+        writeFields     false;
+        writeControl    timeStep;
+        writeInterval   50;
+        log             true;
+    }
+
+    // 히터 표면 대류 열유속 (벽면 열유속) [W/m^2]
+    wallHeatFlux
+    {
+        type            wallHeatFlux;
+        libs            (fieldFunctionObjects);
+        patches         (heater);
+        writeControl    writeTime;
+        log             true;
+    }
+}
+
+// ************************************************************************* //

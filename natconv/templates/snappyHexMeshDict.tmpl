@@ -1,0 +1,130 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+| 냉장고 제상 히터 표면온도 해석 - snappyHexMesh (히터 원통 표면 정합)         |
+\*---------------------------------------------------------------------------*/
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       dictionary;
+    object      snappyHexMeshDict;
+}
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+castellatedMesh true;
+snap            true;
+addLayers       true;
+
+geometry
+{
+    heater.stl
+    {
+        type    triSurfaceMesh;
+        name    heater;
+    }
+
+    // 히터 주변 근접 정밀화 영역 (원통 축 방향으로 긴 실린더 박스 대용 - 거리기반)
+}
+
+castellatedMeshControls
+{
+    maxLocalCells       2000000;
+    maxGlobalCells      5000000;
+    minRefinementCells  10;
+    nCellsBetweenLevels 2;
+    maxLoadUnbalance    0.10;
+    allowFreeStandingZoneFaces true;
+    resolveFeatureAngle 30;
+
+    features
+    (
+        {
+            file    "heater.eMesh";
+            level   __REFINE_MAX__;
+        }
+    );
+
+    refinementSurfaces
+    {
+        heater
+        {
+            level       (__REFINE_MIN__ __REFINE_MAX__);   // 표면 근처 최소2/최대3 (base 5mm -> ~0.6mm)
+            patchInfo   { type wall; }
+        }
+    }
+
+    refinementRegions
+    {
+        heater
+        {
+            mode        distance;
+            levels      ((0.004 3) (0.015 2) (0.04 1));  // 근접장 정밀화
+        }
+    }
+
+    // 유체 영역 내부 (원통 바깥) 한 점
+    locationInMesh      (__LOC_IN_MESH__);
+}
+
+snapControls
+{
+    nSmoothPatch        3;
+    tolerance           2.0;
+    nSolveIter          50;
+    nRelaxIter          5;
+    nFeatureSnapIter    10;
+    implicitFeatureSnap false;
+    explicitFeatureSnap true;
+    multiRegionFeatureSnap false;
+}
+
+addLayersControls
+{
+    relativeSizes       true;
+    layers
+    {
+        heater
+        {
+            nSurfaceLayers  __N_LAYERS__;
+        }
+    }
+    expansionRatio      1.2;
+    finalLayerThickness 0.5;
+    minThickness        0.1;
+    nGrow               0;
+    featureAngle        130;
+    slipFeatureAngle    30;
+    nRelaxIter          5;
+    nSmoothSurfaceNormals 1;
+    nSmoothNormals      3;
+    nSmoothThickness    10;
+    maxFaceThicknessRatio 0.5;
+    maxThicknessToMedialRatio 0.3;
+    minMedialAxisAngle  90;
+    nBufferCellsNoExtrude 0;
+    nLayerIter          50;
+}
+
+meshQualityControls
+{
+    #includeEtc "caseDicts/meshQualityDict"
+
+    // 레이어 추가 단계에서 요구되는 키 (etc 기본 dict에는 없음)
+    nSmoothScale    4;
+    errorReduction  0.75;
+
+    relaxed
+    {
+        maxNonOrtho 75;
+    }
+}
+
+writeFlags
+(
+    scalarLevels
+    layerSets
+    layerFields
+);
+
+mergeTolerance  1e-6;
+
+// ************************************************************************* //

@@ -1,0 +1,76 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+| =========                 |                                                 |
+| \\      /  F ield         | OpenFOAM: The Open Source CFD Toolbox           |
+|  \\    /   O peration     | 냉장고 제상 히터 자연대류+복사 해석 (배경 메시) |
+|   \\  /    A nd           |                                                 |
+|    \\/     M anipulation  |                                                 |
+\*---------------------------------------------------------------------------*/
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       dictionary;
+    object      blockMeshDict;
+}
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+// 단위 m. 히터 원통(D=6.5mm, 길이 100mm)은 원점 중심, 축=z.
+// 개방 공간 박스: 위쪽(y+)을 길게 하여 상승 플룸 포착.
+scale   1;
+
+xMin   __XMIN__;
+xMax   __XMAX__;
+yMin   __YMIN__;   // 히터 아래
+yMax   __YMAX__;   // 히터 위 (플룸)
+zMin   __ZMIN__;
+zMax   __ZMAX__;
+
+// 기본 셀 크기 ~5mm  => 40 x 60 x 40 = 96000 셀
+nx  __NX__;
+ny  __NY__;
+nz  __NZ__;
+
+vertices
+(
+    ($xMin $yMin $zMin)   // 0
+    ($xMax $yMin $zMin)   // 1
+    ($xMax $yMax $zMin)   // 2
+    ($xMin $yMax $zMin)   // 3
+    ($xMin $yMin $zMax)   // 4
+    ($xMax $yMin $zMax)   // 5
+    ($xMax $yMax $zMax)   // 6
+    ($xMin $yMax $zMax)   // 7
+);
+
+blocks
+(
+    hex (0 1 2 3 4 5 6 7) ($nx $ny $nz) simpleGrading (1 1 1)
+);
+
+edges
+(
+);
+
+// 외부 6면을 하나의 개방 경계(farfield)로 묶음
+boundary
+(
+    farfield
+    {
+        type patch;
+        faces
+        (
+            (0 3 2 1)   // zMin
+            (4 5 6 7)   // zMax
+            (0 1 5 4)   // yMin (bottom)
+            (2 3 7 6)   // yMax (top)
+            (1 2 6 5)   // xMax
+            (0 4 7 3)   // xMin
+        );
+    }
+);
+
+mergePatchPairs
+(
+);
+
+// ************************************************************************* //

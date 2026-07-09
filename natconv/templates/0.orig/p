@@ -1,0 +1,32 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+| 냉장고 제상 히터 표면온도 해석 - 압력 p (calculated)                         |
+\*---------------------------------------------------------------------------*/
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       volScalarField;
+    object      p;
+}
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+dimensions      [1 -1 -2 0 0 0 0];
+
+internalField   uniform 1e5;
+
+boundaryField
+{
+    heater
+    {
+        type            calculated;
+        value           uniform 1e5;
+    }
+
+    farfield
+    {
+        type            calculated;
+        value           uniform 1e5;
+    }
+}
+
+// ************************************************************************* //

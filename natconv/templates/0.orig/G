@@ -1,0 +1,28 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+| 냉장고 제상 히터 표면온도 해석 - 입사복사 G (fvDOM)                          |
+\*---------------------------------------------------------------------------*/
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       volScalarField;
+    object      G;
+}
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+dimensions      [1 0 -3 0 0 0 0];
+
+internalField   uniform 0;
+
+boundaryField
+{
+    // 방사율은 boundaryRadiationProperties 에서 lookup (히터 0.95, farfield 1.0)
+    ".*"
+    {
+        type            MarshakRadiation;
+        emissivityMode  lookup;
+        value           uniform 0;
+    }
+}
+
+// ************************************************************************* //
