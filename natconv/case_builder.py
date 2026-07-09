@@ -91,7 +91,11 @@ def build_case(params, env, out_dir):
     # 3) 토큰 치환
     dom = _domain(params, out_dir)
     common = dict(T_INF=params.T_inf, EMISSIVITY=params.heat.emissivity,
-                  END_TIME=params.end_time, N_PROCS=params.n_procs, SOLVER=env.solver,
+                  END_TIME=params.end_time,
+                  # writeInterval < endTime 이어야 최소 1회 중간 write가 발생
+                  # (writeInterval==endTime 이면 OpenFOAM이 최종 시각에 결과를 안 씀)
+                  WRITE_INTERVAL=max(1, params.end_time // 3),
+                  N_PROCS=params.n_procs, SOLVER=env.solver,
                   BASE_CELL=params.base_cell,
                   REFINE_MIN=max(params.refine_level - 1, 1), REFINE_MAX=params.refine_level,
                   N_LAYERS=params.n_layers, Q_FLUX=params.heat.value,
