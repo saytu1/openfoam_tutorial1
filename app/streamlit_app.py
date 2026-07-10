@@ -1,12 +1,15 @@
-"""natconv-studio — 얇은 Streamlit UI (로직은 natconv 코어에 있음)."""
+"""natconv-studio — 얇은 Streamlit UI (로직은 natconv 코어에 있음).
+
+논블로킹 실행: 백그라운드 스레드로 파이프라인을 돌리고 2초마다 자동 새로고침으로
+진행/수렴/결과를 갱신한다. 중지·재개·초기화 지원.
+"""
 import os
 import sys
 import time
-import json
+import shutil
 import threading
 from datetime import datetime
 
-# 프로젝트 루트를 import 경로에 추가
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import streamlit as st
@@ -14,12 +17,13 @@ import streamlit as st
 from natconv.params import Geometry, Heat, Params
 from natconv.environment import MacGerleroEnv
 from natconv.case_builder import build_case
-from natconv.runner import run_pipeline
+from natconv.runner import run_pipeline, read_state, RunController
 from natconv.logparse import parse_convergence
 from natconv import energy, postprocess
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 CASES = os.path.join(ROOT, "cases")
+ss = st.session_state
 
 st.set_page_config(page_title="natconv-studio", layout="wide")
 st.title("natconv-studio — 자연대류 + 복사 표면온도 해석")
@@ -63,22 +67,31 @@ with st.sidebar:
     n_procs = st.slider("병렬 코어 수", 1, 10, 6)
     end_time = st.number_input("최대 반복(endTime)", value=1500, step=100)
 
+    st.header("저장")
+    if "case_name" not in ss:
+        ss.case_name = datetime.now().strftime("run_%Y%m%d_%H%M%S")
+    case_name = st.text_input("케이스 이름 (cases/ 아래)", key="case_name")
+
 params = Params(geometry=geo, heat=Heat(mode=mode, value=value, emissivity=emissivity),
                 T_inf=T_inf, enclosure_factor=enclosure_factor,
                 refine_level=refine_level, n_layers=n_layers,
                 n_procs=n_procs, end_time=int(end_time))
-
 errors = params.validate()
+if not case_name.strip():
+    errors = errors + ["케이스 이름을 입력하세요"]
 if errors:
     st.error("입력 오류: " + "; ".join(errors))
 
-# ---------------- 실시간 모니터링 / 결과 헬퍼 ----------------
+
+# ---------------- 렌더링 헬퍼 ----------------
 def _live_update(case_dir, stage_box, chart_box, kpi_box):
     rs_path = os.path.join(case_dir, "runstate.json")
     if os.path.exists(rs_path):
-        rs = json.load(open(rs_path))
+        rs = read_state(case_dir)
         msg = f"단계 {rs['index']}/{rs['total']}: **{rs['stage']}**"
-        if rs.get("error"):
+        if rs.get("cancelled"):
+            stage_box.warning(f"중지됨 (단계 {rs['index']}: {rs['stage']})")
+        elif rs.get("error"):
             stage_box.error(rs["error"])
         elif rs.get("done"):
             stage_box.success("완료")
@@ -92,6 +105,12 @@ def _live_update(case_dir, stage_box, chart_box, kpi_box):
             kpi_box.metric("현재 표면 평균온도", f"{d['T_avg'][-1] - 273.15:.1f} °C")
 
 
+def _latest_time(case_dir):
+    times = [d for d in os.listdir(case_dir)
+             if d.replace(".", "").isdigit() and os.path.isdir(os.path.join(case_dir, d))]
+    return max(times, key=float) if times else "0"
+
+
 def _show_results(case_dir, params):
     logf = os.path.join(case_dir, "log.solver")
     if not os.path.exists(logf):
@@ -100,18 +119,18 @@ def _show_results(case_dir, params):
     if not d["T_avg"]:
         st.warning("솔버 결과가 없습니다. 로그를 확인하세요.")
         return
-    Tavg = d["T_avg"][-1]; Tmax = d["T_max"][-1]; qr = abs(d["qr"][-1]) if d["qr"] else 0.0
+    Tavg, Tmax = d["T_avg"][-1], d["T_max"][-1]
+    qr = abs(d["qr"][-1]) if d["qr"] else 0.0
     c1, c2, c3 = st.columns(3)
     c1.metric("표면 평균온도", f"{Tavg - 273.15:.1f} °C")
     c2.metric("표면 최고온도", f"{Tmax - 273.15:.1f} °C")
     if params.heat.mode == "flux":
-        q = params.heat.value
-        c3.metric("복사 비중", f"{100 * qr / q:.0f} %")
-        Ts_hand = energy.solve_surface_temp(q, params.geometry.D, params.T_inf,
-                                            params.heat.emissivity)
-        st.caption(f"손계산(Churchill–Chu) 대비: {Ts_hand - 273.15:.0f} °C "
-                   f"(차이 {abs(Ts_hand - Tavg):.0f} K)")
-    # 그림
+        c3.metric("복사 비중", f"{100 * qr / params.heat.value:.0f} %")
+        if params.geometry.kind == "cylinder":
+            Ts_hand = energy.solve_surface_temp(params.heat.value, params.geometry.D,
+                                                params.T_inf, params.heat.emissivity)
+            st.caption(f"손계산(Churchill–Chu) 대비: {Ts_hand - 273.15:.0f} °C "
+                       f"(차이 {abs(Ts_hand - Tavg):.0f} K)")
     try:
         latest = _latest_time(case_dir)
         mp = postprocess.mesh_slice_png(case_dir, os.path.join(case_dir, "mesh.png"))
@@ -124,26 +143,74 @@ def _show_results(case_dir, params):
         st.warning(f"그림 생성 건너뜀: {e}")
 
 
-def _latest_time(case_dir):
-    times = [d for d in os.listdir(case_dir)
-             if d.replace(".", "").isdigit() and os.path.isdir(os.path.join(case_dir, d))]
-    return max(times, key=float)
-
-
-# ---------------- 실행 & 실시간 모니터링 ----------------
-run = st.button("해석 실행", type="primary", disabled=bool(errors))
-
-if run:
-    case_dir = os.path.join(CASES, datetime.now().strftime("%Y%m%d_%H%M%S"))
-    build_case(params, MacGerleroEnv(), case_dir)
-    st.info(f"케이스 생성: `{case_dir}` — 파이프라인 실행 중…")
-
-    th = threading.Thread(target=run_pipeline, args=(MacGerleroEnv(), case_dir), daemon=True)
+def _start(case_dir, start_index=0):
+    ctrl = RunController()
+    th = threading.Thread(target=run_pipeline, args=(MacGerleroEnv(), case_dir),
+                          kwargs={"start_index": start_index, "controller": ctrl}, daemon=True)
     th.start()
+    ss.update(ctrl=ctrl, thread=th, case_dir=case_dir,
+              active=True, stopped=False, finished=False)
 
-    stage_box, chart_box, kpi_box = st.empty(), st.empty(), st.empty()
-    while th.is_alive():
-        _live_update(case_dir, stage_box, chart_box, kpi_box)
-        time.sleep(2)
-    _live_update(case_dir, stage_box, chart_box, kpi_box)
-    _show_results(case_dir, params)
+
+# ---------------- 버튼 ----------------
+active = ss.get("active", False)
+stopped = ss.get("stopped", False)
+b1, b2, b3, b4 = st.columns(4)
+run_clicked = b1.button("해석 실행", type="primary", disabled=bool(errors) or active)
+stop_clicked = b2.button("중지", disabled=not active)
+resume_clicked = b3.button("재개", disabled=not stopped)
+reset_clicked = b4.button("초기화")
+
+if reset_clicked:
+    if ss.get("ctrl"):
+        ss.ctrl.cancel()
+    for k in ["ctrl", "thread", "case_dir", "active", "stopped", "finished"]:
+        ss.pop(k, None)
+    st.rerun()
+
+if run_clicked:
+    case_dir = os.path.join(CASES, case_name.strip())
+    if os.path.exists(case_dir):
+        shutil.rmtree(case_dir)          # 새 실행은 깨끗하게 시작
+    build_case(params, MacGerleroEnv(), case_dir)
+    _start(case_dir)
+    st.rerun()
+
+if stop_clicked and ss.get("ctrl"):
+    ss.ctrl.cancel()
+    ss.active, ss.stopped = False, True
+    st.rerun()
+
+if resume_clicked and ss.get("case_dir"):
+    rs = read_state(ss.case_dir)
+    _start(ss.case_dir, start_index=max(rs.get("index", 1) - 1, 0))
+    st.rerun()
+
+# ---------------- 진행 / 결과 ----------------
+if ss.get("case_dir"):
+    st.caption(f"케이스: `{ss.case_dir}`")
+    _live_update(ss.case_dir, st.empty(), st.empty(), st.empty())
+
+    if ss.get("active"):
+        th = ss.get("thread")
+        if th is None or not th.is_alive():
+            ss.active = False
+            rs = read_state(ss.case_dir)
+            if rs.get("done"):
+                ss.finished = True
+            else:
+                ss.stopped = True        # 중지 또는 에러 → 재개/초기화 가능
+            st.rerun()
+        else:
+            time.sleep(2)
+            st.rerun()
+
+    if ss.get("finished"):
+        _show_results(ss.case_dir, params)
+    elif ss.get("stopped"):
+        rs = read_state(ss.case_dir)
+        if rs.get("error"):
+            st.error(rs["error"] + " — '재개' 또는 '초기화'.")
+        else:
+            st.warning(f"중지됨 (단계 {rs.get('index')}/{rs.get('total')}). "
+                       f"'재개'로 이어서 계속하거나 '초기화'.")

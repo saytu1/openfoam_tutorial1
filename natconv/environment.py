@@ -26,4 +26,5 @@ class MacGerleroEnv(OpenFOAMEnvironment):
         return subprocess.Popen(
             self.build_shell(command, cwd),
             stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True,
+            start_new_session=True,   # 프로세스 그룹 분리 → 취소 시 자식까지 종료 가능
         )

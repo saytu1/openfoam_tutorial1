@@ -1,5 +1,19 @@
 import subprocess
-from natconv.runner import run_pipeline, PIPELINE, read_state
+import time
+from natconv.runner import run_pipeline, PIPELINE, read_state, RunController
+
+
+class RecordingEnv:
+    """실행된 명령을 기록하는 가짜 환경 (즉시 성공)."""
+    solver = "buoyantSimpleFoam"
+
+    def __init__(self):
+        self.ran = []
+
+    def run(self, command, cwd):
+        self.ran.append(command)
+        return subprocess.Popen(["bash", "-c", "true"],
+                                stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
 
 
 class FakeEnv:
@@ -33,3 +47,34 @@ def test_state_persisted(tmp_path):
     run_pipeline(FakeEnv(), str(tmp_path))
     s = read_state(str(tmp_path))
     assert s["done"] is True
+
+
+def test_start_index_skips_stages(tmp_path):
+    # start_index=5 이면 앞 5단계 건너뛰고 solver부터 실행 (재개용)
+    env = RecordingEnv()
+    st = run_pipeline(env, str(tmp_path), start_index=5)
+    assert st.done
+    assert len(env.ran) == len(PIPELINE) - 5
+    assert any("buoyantSimpleFoam" in c for c in env.ran)
+    assert not any(c == "blockMesh" for c in env.ran)
+
+
+def test_precancelled_runs_nothing(tmp_path):
+    env = RecordingEnv()
+    ctrl = RunController()
+    ctrl.cancelled = True
+    st = run_pipeline(env, str(tmp_path), controller=ctrl)
+    assert st.cancelled and not st.done
+    assert env.ran == []
+
+
+def test_controller_cancel_kills_process():
+    ctrl = RunController()
+    p = subprocess.Popen(["bash", "-c", "sleep 30"], start_new_session=True)
+    ctrl.set_proc(p)
+    ctrl.cancel()
+    for _ in range(50):
+        if p.poll() is not None:
+            break
+        time.sleep(0.1)
+    assert p.poll() is not None   # 프로세스가 종료됨
