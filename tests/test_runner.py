@@ -49,6 +49,18 @@ def test_state_persisted(tmp_path):
     assert s["done"] is True
 
 
+def test_read_state_tolerates_partial_file(tmp_path):
+    # 쓰기 도중 읽어 빈/깨진 파일이어도 예외 없이 {} 반환 (동시 접근 경합 방어)
+    (tmp_path / "runstate.json").write_text("")
+    assert read_state(str(tmp_path)) == {}
+    (tmp_path / "runstate.json").write_text("{partial")
+    assert read_state(str(tmp_path)) == {}
+
+
+def test_read_state_missing_returns_empty(tmp_path):
+    assert read_state(str(tmp_path)) == {}
+
+
 def test_start_index_skips_stages(tmp_path):
     # start_index=5 이면 앞 5단계 건너뛰고 solver부터 실행 (재개용)
     env = RecordingEnv()

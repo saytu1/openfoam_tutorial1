@@ -70,13 +70,21 @@ PIPELINE = _pipeline(type("E", (), {"solver": "buoyantSimpleFoam"})())
 
 
 def write_state(case_dir, state):
-    with open(os.path.join(case_dir, "runstate.json"), "w") as f:
+    # 원자적 쓰기: 임시파일에 쓴 뒤 rename → 읽는 쪽이 partial 파일을 절대 못 봄
+    path = os.path.join(case_dir, "runstate.json")
+    tmp = path + ".tmp"
+    with open(tmp, "w") as f:
         json.dump(asdict(state), f)
+    os.replace(tmp, path)
 
 
 def read_state(case_dir):
-    with open(os.path.join(case_dir, "runstate.json")) as f:
-        return json.load(f)
+    # 파일이 없거나(경합) 깨졌으면 예외 대신 빈 dict 반환
+    try:
+        with open(os.path.join(case_dir, "runstate.json")) as f:
+            return json.load(f)
+    except (FileNotFoundError, ValueError):
+        return {}
 
 
 def run_pipeline(env, case_dir, start_index=0, controller=None, on_update=None):

@@ -85,18 +85,17 @@ if errors:
 
 # ---------------- 렌더링 헬퍼 ----------------
 def _live_update(case_dir, stage_box, chart_box, kpi_box):
-    rs_path = os.path.join(case_dir, "runstate.json")
-    if os.path.exists(rs_path):
-        rs = read_state(case_dir)
-        msg = f"단계 {rs['index']}/{rs['total']}: **{rs['stage']}**"
+    rs = read_state(case_dir)
+    if rs:
+        idx, tot, stg = rs.get("index", 0), rs.get("total", 0), rs.get("stage", "")
         if rs.get("cancelled"):
-            stage_box.warning(f"중지됨 (단계 {rs['index']}: {rs['stage']})")
+            stage_box.warning(f"중지됨 (단계 {idx}: {stg})")
         elif rs.get("error"):
             stage_box.error(rs["error"])
         elif rs.get("done"):
             stage_box.success("완료")
         else:
-            stage_box.info(msg)
+            stage_box.info(f"단계 {idx}/{tot}: **{stg}**")
     logf = os.path.join(case_dir, "log.solver")
     if os.path.exists(logf):
         d = parse_convergence(open(logf).read())
