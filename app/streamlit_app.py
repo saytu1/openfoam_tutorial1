@@ -17,7 +17,8 @@ import streamlit as st
 from natconv.params import Geometry, Heat, Params
 from natconv.environment import MacGerleroEnv
 from natconv.case_builder import build_case
-from natconv.runner import run_pipeline, read_state, RunController
+from natconv.runner import (run_pipeline, read_state, RunController,
+                            latest_processor_time, set_end_time)
 from natconv.logparse import parse_convergence
 from natconv import energy, postprocess
 
@@ -71,6 +72,21 @@ with st.sidebar:
     if "case_name" not in ss:
         ss.case_name = datetime.now().strftime("run_%Y%m%d_%H%M%S")
     case_name = st.text_input("케이스 이름 (cases/ 아래)", key="case_name")
+
+    st.header("기존 케이스 이어하기")
+    existing = []
+    if os.path.isdir(CASES):
+        existing = sorted(d for d in os.listdir(CASES)
+                          if os.path.exists(os.path.join(CASES, d, "system/controlDict")))
+    sel_case = st.selectbox("케이스 선택", ["— 없음 —"] + existing)
+    cont_extra = st.number_input("추가 반복 수", value=500, step=100, min_value=1)
+    sel_latest = 0
+    if sel_case != "— 없음 —":
+        sel_latest = latest_processor_time(os.path.join(CASES, sel_case))
+        st.caption(f"현재 마지막 시각: {sel_latest} → 이어서 {sel_latest + int(cont_extra)} 까지")
+    cont_clicked = st.button("이어서 실행", disabled=(sel_case == "— 없음 —" or sel_latest == 0))
+    if sel_case != "— 없음 —" and sel_latest == 0:
+        st.caption("⚠️ 이어할 진행 결과(processor)가 없어 이어하기 불가")
 
 params = Params(geometry=geo, heat=Heat(mode=mode, value=value, emissivity=emissivity),
                 T_inf=T_inf, enclosure_factor=enclosure_factor,
@@ -183,6 +199,13 @@ if stop_clicked and ss.get("ctrl"):
 if resume_clicked and ss.get("case_dir"):
     rs = read_state(ss.case_dir)
     _start(ss.case_dir, start_index=max(rs.get("index", 1) - 1, 0))
+    st.rerun()
+
+if cont_clicked and sel_case != "— 없음 —":
+    case_dir = os.path.join(CASES, sel_case)
+    latest = latest_processor_time(case_dir)
+    set_end_time(case_dir, latest + int(cont_extra))
+    _start(case_dir, start_index=5)     # 메시·분할 건너뛰고 솔버부터 이어서
     st.rerun()
 
 # ---------------- 진행 / 결과 ----------------

@@ -49,6 +49,34 @@ def test_state_persisted(tmp_path):
     assert s["done"] is True
 
 
+def test_latest_processor_time(tmp_path):
+    import os
+    from natconv.runner import latest_processor_time
+    for t in ["0", "500", "1000", "constant"]:
+        os.makedirs(os.path.join(str(tmp_path), "processor0", t))
+    assert latest_processor_time(str(tmp_path)) == 1000
+
+
+def test_latest_processor_time_none(tmp_path):
+    from natconv.runner import latest_processor_time
+    assert latest_processor_time(str(tmp_path)) == 0
+
+
+def test_set_end_time_patches_controldict(tmp_path):
+    import os
+    from natconv.runner import set_end_time
+    os.makedirs(os.path.join(str(tmp_path), "system"))
+    open(os.path.join(str(tmp_path), "system", "controlDict"), "w").write(
+        "startTime       0;\nendTime         1500;         // 상한\ndeltaT          1;\n"
+        "writeInterval   500;\nfunctions\n{\n    x { writeInterval   50; }\n}\n")
+    et, wi = set_end_time(str(tmp_path), 2000)
+    txt = open(os.path.join(str(tmp_path), "system", "controlDict")).read()
+    assert et == 2000 and wi == 666
+    assert "endTime         2000;" in txt
+    assert "writeInterval   666;" in txt
+    assert "writeInterval   50;" in txt   # functionObject 값은 그대로
+
+
 def test_read_state_tolerates_partial_file(tmp_path):
     # 쓰기 도중 읽어 빈/깨진 파일이어도 예외 없이 {} 반환 (동시 접근 경합 방어)
     (tmp_path / "runstate.json").write_text("")

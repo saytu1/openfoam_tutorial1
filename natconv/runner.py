@@ -41,6 +41,35 @@ class RunController:
                     pass
 
 
+def latest_processor_time(case_dir):
+    """processor0 에 기록된 최신 시각(정수). 진행 결과가 없으면 0.
+    이어하기(continue) 가능 여부·시작 시각 판단에 사용."""
+    p0 = os.path.join(case_dir, "processor0")
+    if not os.path.isdir(p0):
+        return 0
+    times = []
+    for d in os.listdir(p0):
+        if os.path.isdir(os.path.join(p0, d)):
+            try:
+                times.append(int(d))
+            except ValueError:
+                pass
+    return max(times) if times else 0
+
+
+def set_end_time(case_dir, end_time):
+    """기존 케이스의 controlDict endTime/writeInterval 을 갱신(이어 돌리기용).
+    최상위(들여쓰기 없는) 항목만 바꾸고 functionObject 값은 보존. 반환 (endTime, writeInterval)."""
+    p = os.path.join(case_dir, "system/controlDict")
+    t = open(p).read()
+    wi = max(1, int(end_time) // 3)
+    t = re.sub(r"(?m)^endTime\s+\d+;.*$", f"endTime         {int(end_time)};", t)
+    t = re.sub(r"(?m)^writeInterval\s+\d+;", f"writeInterval   {wi};", t)
+    with open(p, "w") as f:
+        f.write(t)
+    return int(end_time), wi
+
+
 def _read_nprocs(case_dir):
     """케이스의 decomposeParDict 에서 실제 병렬 분할 수를 읽는다(불일치 방지)."""
     try:
