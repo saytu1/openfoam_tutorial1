@@ -1,7 +1,6 @@
 """natconv-studio — 얇은 Streamlit UI (로직은 natconv 코어에 있음).
 
-논블로킹 실행: 백그라운드 스레드로 파이프라인을 돌리고 2초마다 자동 새로고침으로
-진행/수렴/결과를 갱신한다. 중지·재개·초기화 지원.
+논블로킹 실행 + 중지/재개/초기화 + 기존 케이스 불러오기·이어하기 + 시각화 탭.
 """
 import os
 import sys
@@ -24,19 +23,19 @@ from natconv import energy, postprocess
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 CASES = os.path.join(ROOT, "cases")
+FIGS = ["structure.png", "mesh.png", "temp_cross.png", "temp_field.png"]
 ss = st.session_state
 
 st.set_page_config(page_title="natconv-studio", layout="wide")
 st.title("natconv-studio — 자연대류 + 복사 표면온도 해석")
 
-# ---------------- 사이드바: 파라미터 입력 ----------------
+# ============================ 사이드바: 파라미터 ============================
 with st.sidebar:
     st.header("형상")
     kind = st.selectbox("형상 종류", ["cylinder", "plate", "stl"],
                         format_func=lambda k: {"cylinder": "수평 원통", "plate": "수직 평판",
                                                "stl": "STL 업로드"}[k])
     geo = Geometry(kind=kind)
-    # UI는 mm 입력 → 코어는 m 사용(÷1000)
     if kind == "cylinder":
         geo.D = st.number_input("직경 D [mm]", value=6.5, format="%.2f",
                                 help="원통 히터의 바깥 지름") / 1000.0
@@ -64,7 +63,6 @@ with st.sidebar:
                                                "power": "총 전력 [W]"}[m],
                         help="히터 발열을 주는 방식 — 표면 단위면적당 열유속 / 표면온도 고정 / 총 전력")
     if mode == "fixedT":
-        # UI는 °C 입력 → 코어는 K(+273.15)
         value = st.number_input("표면 온도 [°C]", value=282.0, format="%.1f",
                                 help="히터 표면을 이 온도로 고정하고 방열량을 계산") + 273.15
     else:
@@ -77,7 +75,6 @@ with st.sidebar:
                            help="표면 복사 방출률(0~1). 산화된 금속 표면은 약 0.95")
 
     st.header("주변 / 메시 / 실행")
-    # UI는 °C 입력 → 코어는 K(+273.15)
     T_inf = st.number_input("주변 온도 [°C]", value=25.0, format="%.1f",
                             help="히터를 둘러싼 대기(인클로저 벽)의 온도. "
                                  "자연대류와 복사의 기준(주변) 온도입니다.") + 273.15
@@ -106,21 +103,6 @@ with st.sidebar:
         ss.case_name = datetime.now().strftime("run_%Y%m%d_%H%M%S")
     case_name = st.text_input("케이스 이름 (cases/ 아래)", key="case_name")
 
-    st.header("기존 케이스 이어하기")
-    existing = []
-    if os.path.isdir(CASES):
-        existing = sorted(d for d in os.listdir(CASES)
-                          if os.path.exists(os.path.join(CASES, d, "system/controlDict")))
-    sel_case = st.selectbox("케이스 선택", ["— 없음 —"] + existing)
-    cont_extra = st.number_input("추가 반복 수", value=500, step=100, min_value=1)
-    sel_latest = 0
-    if sel_case != "— 없음 —":
-        sel_latest = latest_processor_time(os.path.join(CASES, sel_case))
-        st.caption(f"현재 마지막 시각: {sel_latest} → 이어서 {sel_latest + int(cont_extra)} 까지")
-    cont_clicked = st.button("이어서 실행", disabled=(sel_case == "— 없음 —" or sel_latest == 0))
-    if sel_case != "— 없음 —" and sel_latest == 0:
-        st.caption("⚠️ 이어할 진행 결과(processor)가 없어 이어하기 불가")
-
 params = Params(geometry=geo, heat=Heat(mode=mode, value=value, emissivity=emissivity),
                 T_inf=T_inf, enclosure_factor=enclosure_factor,
                 refine_level=refine_level, n_layers=n_layers,
@@ -128,70 +110,29 @@ params = Params(geometry=geo, heat=Heat(mode=mode, value=value, emissivity=emiss
 errors = params.validate()
 if not case_name.strip():
     errors = errors + ["케이스 이름을 입력하세요"]
-if errors:
-    st.error("입력 오류: " + "; ".join(errors))
 
 
-# ---------------- 렌더링 헬퍼 ----------------
-def _live_update(case_dir, stage_box, chart_box, kpi_box):
-    rs = read_state(case_dir)
-    if rs:
-        idx, tot, stg = rs.get("index", 0), rs.get("total", 0), rs.get("stage", "")
-        if rs.get("cancelled"):
-            stage_box.warning(f"중지됨 (단계 {idx}: {stg})")
-        elif rs.get("error"):
-            stage_box.error(rs["error"])
-        elif rs.get("done"):
-            stage_box.success("완료")
-        else:
-            stage_box.info(f"단계 {idx}/{tot}: **{stg}**")
-    logf = os.path.join(case_dir, "log.solver")
-    if os.path.exists(logf):
-        d = parse_convergence(open(logf).read())
-        if d["T_avg"]:
-            chart_box.line_chart({"표면 평균 T [K]": d["T_avg"], "표면 최고 T [K]": d["T_max"]})
-            kpi_box.metric("현재 표면 평균온도", f"{d['T_avg'][-1] - 273.15:.1f} °C")
-
-
+# ============================ 헬퍼 ============================
 def _latest_time(case_dir):
     times = [d for d in os.listdir(case_dir)
              if d.replace(".", "").isdigit() and os.path.isdir(os.path.join(case_dir, d))]
     return max(times, key=float) if times else "0"
 
 
-def _show_results(case_dir, params):
-    logf = os.path.join(case_dir, "log.solver")
-    if not os.path.exists(logf):
-        return
-    d = parse_convergence(open(logf).read())
-    if not d["T_avg"]:
-        st.warning("솔버 결과가 없습니다. 로그를 확인하세요.")
-        return
-    Tavg, Tmax = d["T_avg"][-1], d["T_max"][-1]
-    qr = abs(d["qr"][-1]) if d["qr"] else 0.0
-    c1, c2, c3 = st.columns(3)
-    c1.metric("표면 평균온도", f"{Tavg - 273.15:.1f} °C")
-    c2.metric("표면 최고온도", f"{Tmax - 273.15:.1f} °C")
-    if params.heat.mode == "flux":
-        c3.metric("복사 비중", f"{100 * qr / params.heat.value:.0f} %")
-        if params.geometry.kind == "cylinder":
-            Ts_hand = energy.solve_surface_temp(params.heat.value, params.geometry.D,
-                                                params.T_inf, params.heat.emissivity)
-            st.caption(f"손계산(Churchill–Chu) 대비: {Ts_hand - 273.15:.0f} °C "
-                       f"(차이 {abs(Ts_hand - Tavg):.0f} K)")
-    try:
-        latest = _latest_time(case_dir)
-        mp = postprocess.mesh_slice_png(case_dir, os.path.join(case_dir, "mesh.png"))
-        tp = postprocess.temperature_slice_png(case_dir, latest,
-                                               os.path.join(case_dir, "temp.png"))
-        g1, g2 = st.columns(2)
-        g1.image(mp, caption="단면 메시")
-        g2.image(tp, caption="단면 온도장 (상단이 뜨거움)")
-    except Exception as e:
-        st.warning(f"그림 생성 건너뜀: {e}")
+def _fig(case_dir, name, genfunc):
+    """png 캐시: 없으면 생성해 경로 반환."""
+    p = os.path.join(case_dir, name)
+    if not os.path.exists(p):
+        genfunc(p)
+    return p
 
 
 def _start(case_dir, start_index=0):
+    for f in FIGS:                     # 새 실행 → 이전 그림 캐시 제거(완료 후 재생성)
+        try:
+            os.remove(os.path.join(case_dir, f))
+        except OSError:
+            pass
     ctrl = RunController()
     th = threading.Thread(target=run_pipeline, args=(MacGerleroEnv(), case_dir),
                           kwargs={"start_index": start_index, "controller": ctrl}, daemon=True)
@@ -200,15 +141,112 @@ def _start(case_dir, start_index=0):
               active=True, stopped=False, finished=False)
 
 
-# ---------------- 버튼 ----------------
+def _stage_banner(case_dir, box):
+    rs_path = os.path.join(case_dir, "runstate.json")
+    if not os.path.exists(rs_path):
+        return
+    rs = read_state(case_dir)
+    if rs.get("cancelled"):
+        box.warning(f"중지됨 (단계 {rs['index']}: {rs['stage']}) — '재개' 또는 '초기화'")
+    elif rs.get("error"):
+        box.error(rs["error"] + " — '재개' 또는 '초기화'")
+    elif rs.get("done"):
+        box.success("완료")
+    else:
+        box.info(f"진행 중 · 단계 {rs['index']}/{rs['total']}: **{rs['stage']}**")
+
+
+def _render_tabs(case_dir, params, active):
+    t1, t2, t3, t4 = st.tabs(["🧊 구조 모델", "🔲 메쉬 구조", "📈 온도 그래프", "🌡 온도 프로파일"])
+
+    with t3:   # 온도 그래프 (가벼움 → 항상 렌더)
+        logf = os.path.join(case_dir, "log.solver")
+        d = parse_convergence(open(logf).read()) if os.path.exists(logf) else {"T_avg": [], "T_max": [], "qr": []}
+        if d["T_avg"]:
+            k1, k2, k3 = st.columns(3)
+            k1.metric("표면 평균온도", f"{d['T_avg'][-1] - 273.15:.1f} °C")
+            k2.metric("표면 최고온도", f"{d['T_max'][-1] - 273.15:.1f} °C")
+            if params.heat.mode == "flux" and d["qr"]:
+                k3.metric("복사 비중", f"{100 * abs(d['qr'][-1]) / params.heat.value:.0f} %")
+            st.line_chart({"표면 평균 T [K]": d["T_avg"], "표면 최고 T [K]": d["T_max"]})
+            if params.heat.mode == "flux" and params.geometry.kind == "cylinder":
+                Ts = energy.solve_surface_temp(params.heat.value, params.geometry.D,
+                                               params.T_inf, params.heat.emissivity)
+                st.caption(f"손계산(Churchill–Chu) 대비: {Ts - 273.15:.0f} °C "
+                           f"(차이 {abs(Ts - d['T_avg'][-1]):.0f} K)")
+        else:
+            st.info("솔버 수렴 데이터가 아직 없습니다. (솔버 로그는 단계 완료 후 기록됩니다)")
+
+    with t1:   # 구조 모델
+        if active:
+            st.info("완료 후 표시됩니다.")
+        else:
+            try:
+                st.image(_fig(case_dir, "structure.png",
+                              lambda p: postprocess.structure_png(case_dir, p)))
+            except Exception:
+                st.info("구조 모델 데이터(STL)가 아직 없습니다.")
+
+    with t2:   # 메쉬 구조
+        if active:
+            st.info("완료 후 표시됩니다.")
+        else:
+            try:
+                st.image(_fig(case_dir, "mesh.png",
+                              lambda p: postprocess.mesh_slice_png(case_dir, p)))
+            except Exception:
+                st.info("메시가 아직 생성되지 않았습니다.")
+
+    with t4:   # 온도 프로파일 (주변 시각화)
+        latest = _latest_time(case_dir)
+        if active or latest == "0":
+            st.info("완료 후 표시됩니다.")
+        else:
+            try:
+                col1, col2 = st.columns(2)
+                col1.image(_fig(case_dir, "temp_cross.png",
+                                lambda p: postprocess.temperature_crosssection_png(case_dir, latest, p)),
+                           caption="단면 온도장 (상단이 뜨거움)")
+                col2.image(_fig(case_dir, "temp_field.png",
+                                lambda p: postprocess.temperature_field_png(case_dir, latest, p)),
+                           caption="주변 온도 프로파일 (상승 플룸 + 대기)")
+            except Exception as e:
+                st.warning(f"온도장 그림 생성 실패: {e}")
+
+
+# ============================ 상단: 기존 해석 불러오기 · 이어하기 ============================
+existing = []
+if os.path.isdir(CASES):
+    existing = sorted(d for d in os.listdir(CASES)
+                      if os.path.exists(os.path.join(CASES, d, "system/controlDict")))
+
+with st.container(border=True):
+    st.markdown("**📂 기존 해석 불러오기 · 이어하기**")
+    c1, c2, c3, c4 = st.columns([3, 1, 1.2, 1.4])
+    sel_case = c1.selectbox("케이스 선택", ["— 없음 —"] + existing, label_visibility="collapsed")
+    load_clicked = c2.button("불러오기", disabled=(sel_case == "— 없음 —"), use_container_width=True)
+    cont_extra = c3.number_input("추가 반복", value=500, step=100, min_value=1, label_visibility="collapsed")
+    cont_clicked = c4.button("이어서 실행", disabled=(sel_case == "— 없음 —"), use_container_width=True)
+    if sel_case != "— 없음 —":
+        _lt = latest_processor_time(os.path.join(CASES, sel_case))
+        if _lt:
+            st.caption(f"`{sel_case}` — 마지막 시각 {_lt} · 불러오면 시각화 표시 / 이어서 {_lt + int(cont_extra)} 까지 계산")
+        else:
+            st.caption(f"`{sel_case}` — 진행 결과(processor) 없음: 이어하기 불가")
+
+# ============================ 실행 버튼 ============================
 active = ss.get("active", False)
 stopped = ss.get("stopped", False)
 b1, b2, b3, b4 = st.columns(4)
-run_clicked = b1.button("해석 실행", type="primary", disabled=bool(errors) or active)
-stop_clicked = b2.button("중지", disabled=not active)
-resume_clicked = b3.button("재개", disabled=not stopped)
-reset_clicked = b4.button("초기화")
+run_clicked = b1.button("▶ 해석 실행", type="primary", disabled=bool(errors) or active)
+stop_clicked = b2.button("■ 중지", disabled=not active)
+resume_clicked = b3.button("↻ 재개", disabled=not stopped)
+reset_clicked = b4.button("✕ 초기화")
 
+if errors:
+    st.error("입력 오류: " + "; ".join(errors))
+
+# ---- 버튼 핸들러 ----
 if reset_clicked:
     if ss.get("ctrl"):
         ss.ctrl.cancel()
@@ -219,7 +257,7 @@ if reset_clicked:
 if run_clicked:
     case_dir = os.path.join(CASES, case_name.strip())
     if os.path.exists(case_dir):
-        shutil.rmtree(case_dir)          # 새 실행은 깨끗하게 시작
+        shutil.rmtree(case_dir)
     build_case(params, MacGerleroEnv(), case_dir)
     _start(case_dir)
     st.rerun()
@@ -234,38 +272,35 @@ if resume_clicked and ss.get("case_dir"):
     _start(ss.case_dir, start_index=max(rs.get("index", 1) - 1, 0))
     st.rerun()
 
+if load_clicked and sel_case != "— 없음 —":
+    ss.update(case_dir=os.path.join(CASES, sel_case),
+              active=False, stopped=False, finished=True, ctrl=None, thread=None)
+    st.rerun()
+
 if cont_clicked and sel_case != "— 없음 —":
     case_dir = os.path.join(CASES, sel_case)
     latest = latest_processor_time(case_dir)
     set_end_time(case_dir, latest + int(cont_extra))
-    _start(case_dir, start_index=5)     # 메시·분할 건너뛰고 솔버부터 이어서
+    _start(case_dir, start_index=5)
     st.rerun()
 
-# ---------------- 진행 / 결과 ----------------
+# ============================ 진행 상태 + 시각화 탭 ============================
 if ss.get("case_dir"):
     st.caption(f"케이스: `{ss.case_dir}`")
-    _live_update(ss.case_dir, st.empty(), st.empty(), st.empty())
+    _stage_banner(ss.case_dir, st.empty())
+
+    _render_tabs(ss.case_dir, params, ss.get("active", False))
 
     if ss.get("active"):
         th = ss.get("thread")
         if th is None or not th.is_alive():
             ss.active = False
             rs = read_state(ss.case_dir)
-            if rs.get("done"):
-                ss.finished = True
-            else:
-                ss.stopped = True        # 중지 또는 에러 → 재개/초기화 가능
+            ss.finished = bool(rs.get("done"))
+            ss.stopped = not ss.finished
             st.rerun()
         else:
             time.sleep(2)
             st.rerun()
-
-    if ss.get("finished"):
-        _show_results(ss.case_dir, params)
-    elif ss.get("stopped"):
-        rs = read_state(ss.case_dir)
-        if rs.get("error"):
-            st.error(rs["error"] + " — '재개' 또는 '초기화'.")
-        else:
-            st.warning(f"중지됨 (단계 {rs.get('index')}/{rs.get('total')}). "
-                       f"'재개'로 이어서 계속하거나 '초기화'.")
+else:
+    st.info("좌측에서 파라미터를 설정하고 **해석 실행**을 누르거나, 위에서 **기존 해석을 불러오세요**.")
