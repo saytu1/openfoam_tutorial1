@@ -41,5 +41,8 @@ python3 -m venv .venv && .venv/bin/pip install -r requirements.txt
 
 Mac(ESI v2606)에서 검증된 `tutorial_1` 결과와 일치.
 
-설계·계획: `docs/superpowers/specs/`, `docs/superpowers/plans/`.
-사무실(WSL) 이식: 상위 폴더의 `사무실_WSL_natconv-studio_구축_프롬프트.md`.
+## 문서
+
+- **`REQUIREMENTS.md`** — 요구조건 · 설계구조 · 개발 진척 현황 · 버전 이력 (프로젝트 단일 관리 문서)
+- 설계·계획: `docs/superpowers/specs/`, `docs/superpowers/plans/`
+- 사무실(WSL) 이식: 상위 폴더의 `사무실_WSL_natconv-studio_구축_프롬프트.md`
