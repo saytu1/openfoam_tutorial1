@@ -8,8 +8,8 @@
 | 프로젝트 | natconv-studio (자연대류 + 복사 표면온도 해석 GUI) |
 | **현재 버전** | **v1.0.0 — 1차 완성 (Phase 1)** (2026-07-16) |
 | 상태 | 1차 완성 · 다음 단계(증발기 결합 해석) 준비 |
-| 저장소 | `/Users/wooya/claude/openfoam/natconv-studio` (git, branch `main`) |
-| 테스트 | 34 passed |
+| 저장소 | `/Users/wooya/claude/openfoam/natconv-studio` (git, branch `phase2a-evaporator-geometry`) |
+| 테스트 | 40 passed |
 
 ---
 
@@ -140,7 +140,7 @@ natconv-studio/
 - [x] UI 단위 mm/°C 전환 + 항목별 tooltip
 - [x] 버그 수정 4건 (4-3 표의 하단 4개 항목)
 
-### 5-2. 테스트 현황 (34개, 전부 통과)
+### 5-2. 테스트 현황 (40개, 전부 통과)
 
 | 테스트 파일 | 개수 | 대상 |
 |---|---:|---|
@@ -149,6 +149,7 @@ natconv-studio/
 | `test_case_builder.py` | 4 | 케이스 생성·BC·토큰 치환 |
 | `test_energy.py` | 2 | 손계산·에너지 평형 |
 | `test_geometry.py` | 2 | STL 생성·면적 |
+| `test_evaporator_geometry.py` | 2 | 튜브 다발 좌표·면적 |
 | `test_environment.py` | 2 | 실행 래핑·솔버명 |
 | `test_postprocess.py` | 2 | 필드 파서 |
 | `test_templates_present.py` | 2 | 템플릿 존재·품질키 |
