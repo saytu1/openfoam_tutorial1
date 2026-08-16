@@ -79,8 +79,11 @@ def cols_z(n, pitch):
     return [-pitch * (n - 1) / 2 + pitch * j for j in range(n)]
 
 
-def _cyl_x(f, x0, x1, yc, zc, r, n=40):
-    """x축 원통(중심 yc,zc)을 열린 STL 파일 f에 기록 (측면+양끝 캡)."""
+def _cyl_x(f, x0, x1, yc, zc, r, n=40, caps=(True, True)):
+    """x축 원통(중심 yc,zc)을 열린 STL 파일 f에 기록 (측면+양끝 캡 선택).
+
+    caps: (x0에 캡을 씌울지, x1에 캡을 씌울지). 기본값은 양끝 모두 캡.
+    """
     pts = [(yc + r * math.cos(2 * math.pi * i / n), zc + r * math.sin(2 * math.pi * i / n))
            for i in range(n)]
     for i in range(n):
@@ -88,8 +91,10 @@ def _cyl_x(f, x0, x1, yc, zc, r, n=40):
         y1, z1 = pts[(i + 1) % n]
         _facet(f, (x0, y0, z0), (x1, y1, z1), (x1, y0, z0))
         _facet(f, (x0, y0, z0), (x0, y1, z1), (x1, y1, z1))
-        _facet(f, (x0, yc, zc), (x0, y1, z1), (x0, y0, z0))
-        _facet(f, (x1, yc, zc), (x1, y0, z0), (x1, y1, z1))
+        if caps[0]:
+            _facet(f, (x0, yc, zc), (x0, y1, z1), (x0, y0, z0))
+        if caps[1]:
+            _facet(f, (x1, yc, zc), (x1, y0, z0), (x1, y1, z1))
 
 
 def write_tube_bank_stl(path, D_t, ys, zs, x0, x1):
@@ -154,7 +159,7 @@ def write_heater_hairpin_stl(path, D_h, x0, x1, z_pitch, yc):
     zc = z_pitch / 2.0
     with open(path, "w") as f:
         f.write("solid heater\n")
-        _cyl_x(f, x0, x1, yc, -zc, r)     # 다리 1
-        _cyl_x(f, x0, x1, yc, +zc, r)     # 다리 2
+        _cyl_x(f, x0, x1, yc, -zc, r, caps=(True, False))     # 다리 1 (x1은 U밴드로 이어짐, 캡 없음)
+        _cyl_x(f, x0, x1, yc, +zc, r, caps=(True, False))     # 다리 2 (x1은 U밴드로 이어짐, 캡 없음)
         _ubend_x(f, x1, yc, zc, r)        # 오른쪽 U밴드(z=-zc→+zc)
         f.write("endsolid heater\n")
