@@ -9,7 +9,7 @@
 | **현재 버전** | **v1.0.0 — 1차 완성 (Phase 1)** (2026-07-16) |
 | 상태 | 1차 완성 · 다음 단계(증발기 결합 해석) 준비 |
 | 저장소 | `/Users/wooya/claude/openfoam/natconv-studio` (git, branch `phase2a-evaporator-geometry`) |
-| 테스트 | 45 passed |
+| 테스트 | 48 passed |
 
 ---
 
@@ -90,7 +90,8 @@ natconv-studio/
 │   ├── params.py               # Params 데이터클래스 = 한 해석의 단일 진실 소스 + 검증
 │   ├── geometry.py             # 원통·평판 STL 생성, STL 면적/바운딩박스
 │   ├── case_builder.py         # Params → 케이스 폴더(도메인 자동 산정, BC 분기)
-│   ├── templates/              # 검증된 dict 템플릿(토큰 치환식)
+│   ├── evaporator_case.py      # Evaporator → 3 STL(튜브/핀/히터) 생성(Phase 2A)
+│   ├── templates/              # 검증된 dict 템플릿(토큰 치환식, snappyHexMeshDict_evap 포함)
 │   ├── environment.py          # OpenFOAM 실행 추상화(MacGerleroEnv, WSL drop-in 지점)
 │   ├── runner.py               # 파이프라인 오케스트레이션·RunState·취소(RunController)·이어하기
 │   ├── logparse.py             # 솔버 로그 → 수렴 시계열(T 평균/최고, qr)
@@ -139,8 +140,9 @@ natconv-studio/
 - [x] 시각화 탭 4종 (구조 · 메쉬 · 온도그래프 · 온도프로파일)
 - [x] UI 단위 mm/°C 전환 + 항목별 tooltip
 - [x] 버그 수정 4건 (4-3 표의 하단 4개 항목)
+- [x] Phase 2A: 증발기 케이스 빌더(`evaporator_case.py`) — 튜브/핀/히터 3 STL 생성 + snappy baffle(핀) 템플릿
 
-### 5-2. 테스트 현황 (40개, 전부 통과)
+### 5-2. 테스트 현황 (43개+, 전부 통과 — 실제 `pytest` 총계는 상단 표 참조)
 
 | 테스트 파일 | 개수 | 대상 |
 |---|---:|---|
@@ -150,6 +152,7 @@ natconv-studio/
 | `test_energy.py` | 2 | 손계산·에너지 평형 |
 | `test_geometry.py` | 2 | STL 생성·면적 |
 | `test_evaporator_geometry.py` | 7 | 튜브 다발 좌표·면적·핀 개수·핀 면적·핀 span·히터 길이·히터 STL 면적 |
+| `test_evaporator_case.py` | 3 | 증발기 케이스 빌더: 3 STL 생성·히터 위치(최하단 튜브보다 아래)·히터 전개길이 |
 | `test_environment.py` | 2 | 실행 래핑·솔버명 |
 | `test_postprocess.py` | 2 | 필드 파서 |
 | `test_templates_present.py` | 2 | 템플릿 존재·품질키 |
