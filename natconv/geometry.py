@@ -69,3 +69,33 @@ def stl_bounds(path):
     lo = tuple(min(p[i] for p in pts) for i in range(3))
     hi = tuple(max(p[i] for p in pts) for i in range(3))
     return lo, hi
+
+
+def rows_y(n, pitch):
+    return [-pitch * (n - 1) / 2 + pitch * i for i in range(n)]
+
+
+def cols_z(n, pitch):
+    return [-pitch * (n - 1) / 2 + pitch * j for j in range(n)]
+
+
+def _cyl_x(f, x0, x1, yc, zc, r, n=40):
+    """x축 원통(중심 yc,zc)을 열린 STL 파일 f에 기록 (측면+양끝 캡)."""
+    pts = [(yc + r * math.cos(2 * math.pi * i / n), zc + r * math.sin(2 * math.pi * i / n))
+           for i in range(n)]
+    for i in range(n):
+        y0, z0 = pts[i]
+        y1, z1 = pts[(i + 1) % n]
+        _facet(f, (x0, y0, z0), (x1, y1, z1), (x1, y0, z0))
+        _facet(f, (x0, y0, z0), (x0, y1, z1), (x1, y1, z1))
+        _facet(f, (x0, yc, zc), (x0, y1, z1), (x0, y0, z0))
+        _facet(f, (x1, yc, zc), (x1, y0, z0), (x1, y1, z1))
+
+
+def write_tube_bank_stl(path, D_t, ys, zs, x0, x1):
+    with open(path, "w") as f:
+        f.write("solid tubes\n")
+        for yc in ys:
+            for zc in zs:
+                _cyl_x(f, x0, x1, yc, zc, D_t / 2)
+        f.write("endsolid tubes\n")
