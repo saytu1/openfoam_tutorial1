@@ -46,6 +46,7 @@ OpenFOAM으로 **자연대류 + 복사** 열전달 표면온도 해석을 수행
 | FR-8 | **결과 지표**: 표면 평균/최고온도, 복사 비중, 손계산(Churchill–Chu) 대비 비교 | ✅ 구현 |
 | FR-9 | **UI 편의**: 길이 mm · 온도 °C 입력(코어는 SI 유지), 항목별 마우스오버 설명, 케이스 이름 지정 | ✅ 구현 |
 | FR-10 | 진행 상태 실시간 표시(단계 표시등, 2초 자동 갱신) | ✅ 구현(단, 3-3 제약) |
+| FR-11 | **증발기 입력 섹션**: 사이드바 "🧊 증발기"에서 "증발기 포함" 체크 시 튜브/핀/히터 치수(mm) 입력 → `build_evaporator_geometry`로 STL 생성, 구조 모델 탭이 튜브+핀+히터 다중 STL(`structure_multi_png`)을 렌더 (Phase 2A: 형상·메시까지, 솔버 결합은 2B) | ✅ 구현 |
 
 ### 3-2. 비기능 요구사항 (NFR)
 
@@ -95,7 +96,7 @@ natconv-studio/
 │   ├── environment.py          # OpenFOAM 실행 추상화(MacGerleroEnv, WSL drop-in 지점)
 │   ├── runner.py               # 파이프라인 오케스트레이션·RunState·취소(RunController)·이어하기
 │   ├── logparse.py             # 솔버 로그 → 수렴 시계열(T 평균/최고, qr)
-│   ├── postprocess.py          # 필드/메시 파싱 → 구조·메시·온도장 그림
+│   ├── postprocess.py          # 필드/메시 파싱 → 구조·메시·온도장 그림 (증발기 다중 STL 포함)
 │   └── energy.py               # Churchill–Chu 손계산 + 에너지 평형
 ├── app/streamlit_app.py        # 얇은 UI: 파라미터 · 실행제어 · 불러오기 · 시각화 탭
 ├── tests/                      # pytest (코어 단위 테스트)
@@ -141,6 +142,7 @@ natconv-studio/
 - [x] UI 단위 mm/°C 전환 + 항목별 tooltip
 - [x] 버그 수정 4건 (4-3 표의 하단 4개 항목)
 - [x] Phase 2A: 증발기 케이스 빌더(`evaporator_case.py`) — 튜브/핀/히터 3 STL 생성 + snappy baffle(핀) 템플릿
+- [x] Phase 2A: GUI 증발기 입력 섹션 + 다중 STL 시각화(`postprocess.structure_multi_png`) (2026-08-16)
 
 ### 5-2. 테스트 현황 (43개+, 전부 통과 — 실제 `pytest` 총계는 상단 표 참조)
 

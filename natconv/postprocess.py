@@ -118,6 +118,25 @@ def structure_png(case_dir, out_png):
     return out_png
 
 
+def structure_multi_png(case_dir, out_png):
+    """구조 모델(증발기): 튜브(회색)+핀(연파랑)+히터(주황) STL을 하나의 3D로 렌더."""
+    parts = [("tubes.stl", "#9ca3af"), ("fins.stl", "#93c5fd"), ("heater.stl", "#f59e0b")]
+    fig = plt.figure(figsize=(7, 6))
+    ax = fig.add_subplot(111, projection="3d")
+    for fname, color in parts:
+        path = os.path.join(case_dir, "constant/triSurface", fname)
+        if not os.path.exists(path):
+            continue
+        tris = _read_stl_tris(path)
+        tris_p = tris[:, :, [0, 2, 1]]
+        ax.add_collection3d(Poly3DCollection(tris_p, facecolor=color, edgecolor="none", alpha=0.95))
+    ax.set_xlabel("x (수평, m)"); ax.set_ylabel("z (축, m)"); ax.set_zlabel("y (연직 ↑, m)")
+    ax.set_title("구조 모델: 증발기 (튜브+핀+히터)")
+    ax.set_box_aspect((2, 2, 3)); ax.view_init(elev=16, azim=-72)
+    fig.tight_layout(); fig.savefig(out_png, dpi=130); plt.close(fig)
+    return out_png
+
+
 def mesh_slice_png(case_dir, out_png, half=None, z0=0.0, tol=1e-6):
     """z=0 평면 메시 단면 (히터 주변 정밀화 + 프리즘 레이어)."""
     if half is None:
