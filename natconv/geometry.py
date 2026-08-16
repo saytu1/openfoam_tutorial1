@@ -119,3 +119,42 @@ def write_fins_stl(path, ys, fin_h, fin_z, pitch_x, x0, x1):
                 _facet(f, a, b, c)
                 _facet(f, a, c, d)
         f.write("endsolid fins\n")
+
+
+def heater_total_length(x0, x1, z_pitch):
+    R = z_pitch / 2.0
+    return 2.0 * (x1 - x0) + math.pi * R
+
+
+def _ubend_x(f, xc, yc, R, r, n=40, m=24):
+    """x-z 평면 반원(중심 xc,yc, 반경 R, z=-R→+R, +x로 볼록) 중심선을 따라 반경 r 튜브 스윕."""
+    phis = [(-math.pi / 2) + math.pi * k / m for k in range(m + 1)]
+    rings = []
+    for phi in phis:
+        cx, cz = xc + R * math.cos(phi), R * math.sin(phi)
+        u = (math.cos(phi), 0.0, math.sin(phi))   # 접선에 수직(면내)
+        ring = []
+        for i in range(n):
+            th = 2 * math.pi * i / n
+            ring.append((cx + r * math.cos(th) * u[0],
+                         yc + r * math.sin(th),
+                         cz + r * math.cos(th) * u[2]))
+        rings.append(ring)
+    for k in range(m):
+        for i in range(n):
+            a = rings[k][i]; b = rings[k][(i + 1) % n]
+            c = rings[k + 1][(i + 1) % n]; d = rings[k + 1][i]
+            _facet(f, a, b, c)
+            _facet(f, a, c, d)
+
+
+def write_heater_hairpin_stl(path, D_h, x0, x1, z_pitch, yc):
+    """2열(z=±z_pitch/2) 직관 다리 + 오른쪽(x1) U밴드로 이은 hairpin."""
+    r = D_h / 2.0
+    zc = z_pitch / 2.0
+    with open(path, "w") as f:
+        f.write("solid heater\n")
+        _cyl_x(f, x0, x1, yc, -zc, r)     # 다리 1
+        _cyl_x(f, x0, x1, yc, +zc, r)     # 다리 2
+        _ubend_x(f, x1, yc, zc, r)        # 오른쪽 U밴드(z=-zc→+zc)
+        f.write("endsolid heater\n")

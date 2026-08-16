@@ -35,3 +35,21 @@ def test_fins_span_depth(tmp_path):
     write_fins_stl(p, rows_y(6, 0.03), 0.030, 0.060, 0.008, -0.3, 0.3)
     lo, hi = stl_bounds(p)
     assert abs(hi[2] - 0.030) < 1e-9 and abs(lo[2] + 0.030) < 1e-9  # z ±30mm
+
+
+import math
+from natconv.geometry import write_heater_hairpin_stl, heater_total_length, stl_area
+
+
+def test_heater_length():
+    L = heater_total_length(-0.3, 0.3, 0.030)   # 다리 0.6*2 + πR, R=0.015
+    assert abs(L - (2 * 0.6 + math.pi * 0.015)) < 1e-9
+    assert abs(L - 1.24712) < 1e-3               # ≈1247mm
+
+
+def test_heater_area(tmp_path):
+    p = str(tmp_path / "heater.stl")
+    write_heater_hairpin_stl(p, 0.0065, -0.3, 0.3, 0.030, -0.11225)
+    L = heater_total_length(-0.3, 0.3, 0.030)
+    lateral = math.pi * 0.0065 * L
+    assert abs(stl_area(p) - lateral) / lateral < 0.10   # 캡 없음(U로 이어짐) 대략

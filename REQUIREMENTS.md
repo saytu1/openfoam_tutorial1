@@ -9,7 +9,7 @@
 | **현재 버전** | **v1.0.0 — 1차 완성 (Phase 1)** (2026-07-16) |
 | 상태 | 1차 완성 · 다음 단계(증발기 결합 해석) 준비 |
 | 저장소 | `/Users/wooya/claude/openfoam/natconv-studio` (git, branch `phase2a-evaporator-geometry`) |
-| 테스트 | 43 passed |
+| 테스트 | 45 passed |
 
 ---
 
@@ -149,7 +149,7 @@ natconv-studio/
 | `test_case_builder.py` | 4 | 케이스 생성·BC·토큰 치환 |
 | `test_energy.py` | 2 | 손계산·에너지 평형 |
 | `test_geometry.py` | 2 | STL 생성·면적 |
-| `test_evaporator_geometry.py` | 5 | 튜브 다발 좌표·면적·핀 개수·핀 면적·핀 span |
+| `test_evaporator_geometry.py` | 7 | 튜브 다발 좌표·면적·핀 개수·핀 면적·핀 span·히터 길이·히터 STL 면적 |
 | `test_environment.py` | 2 | 실행 래핑·솔버명 |
 | `test_postprocess.py` | 2 | 필드 파서 |
 | `test_templates_present.py` | 2 | 템플릿 존재·품질키 |
