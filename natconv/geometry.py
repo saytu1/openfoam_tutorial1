@@ -99,3 +99,23 @@ def write_tube_bank_stl(path, D_t, ys, zs, x0, x1):
             for zc in zs:
                 _cyl_x(f, x0, x1, yc, zc, D_t / 2)
         f.write("endsolid tubes\n")
+
+
+def n_fins(x0, x1, pitch):
+    return int(round((x1 - x0) / pitch)) + 1
+
+
+def write_fins_stl(path, ys, fin_h, fin_z, pitch_x, x0, x1):
+    """각 단(y) 중심에 fin_h(y)×fin_z(z) 사각 핀을 x방향 pitch_x 간격으로. 두께 0."""
+    hz = fin_z / 2.0
+    xs = [x0 + pitch_x * k for k in range(n_fins(x0, x1, pitch_x))]
+    with open(path, "w") as f:
+        f.write("solid fins\n")
+        for xf in xs:
+            for yc in ys:
+                y0, y1 = yc - fin_h / 2, yc + fin_h / 2
+                a = (xf, y0, -hz); b = (xf, y1, -hz)
+                c = (xf, y1, hz); d = (xf, y0, hz)
+                _facet(f, a, b, c)
+                _facet(f, a, c, d)
+        f.write("endsolid fins\n")
