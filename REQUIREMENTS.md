@@ -9,7 +9,7 @@
 | **현재 버전** | **v1.0.0 — 1차 완성 (Phase 1)** (2026-07-16) |
 | 상태 | 1차 완성(Phase 1) · **Phase 2A(증발기+히터 형상·메시) 완료** |
 | 저장소 | `/Users/wooya/claude/openfoam/natconv-studio` (git, branch `phase2a-evaporator-geometry`) |
-| 테스트 | 48 passed |
+| 테스트 | 49 passed |
 
 ---
 
@@ -144,8 +144,7 @@ natconv-studio/
 - [x] 버그 수정 4건 (4-3 표의 하단 4개 항목)
 - [x] Phase 2A: 증발기 케이스 빌더(`evaporator_case.py`) — 튜브/핀/히터 3 STL 생성 + snappy baffle(핀) 템플릿
 - [x] Phase 2A: GUI 증발기 입력 섹션 + 다중 STL 시각화(`postprocess.structure_multi_png`) (2026-08-16)
-- [x] Phase 2A: 전체 케이스 빌드(`build_phase2a_case`) + 실제 메시 생성 검증 — 1.63M 셀, checkMesh 통과, 패치 분리(tubes·heater 벽 / fins baffle) (2026-08-16)
-- [x] Phase 2A: 통합 검증 — `build_phase2a_case`로 실제 메시 생성(`cases/p2a`), blockMesh(30.9만 배경셀)→surfaceFeatureExtract→snappyHexMesh(1,628,906셀)→checkMesh 실행. patch: tubes(74794면, 면적 0.1931 m² ≈ 12·πD·L=0.1810 m² 대비 +6.7%)·heater(11118면)·fins/fins_slave(baffle, 각 210230면). checkMesh: 위상 OK, skewness>4 면 1건(경미, 미해결 항목 아님)만 실패 (2026-08-16)
+- [x] Phase 2A: 통합 검증 — `build_phase2a_case`로 실제 메시 생성(`cases/p2a`), blockMesh(30.9만 배경셀)→surfaceFeatureExtract→snappyHexMesh(1,628,906셀)→checkMesh 실행. patch: tubes(74794면, 면적 0.1931 m² ≈ 12·πD·L=0.1810 m² 대비 +6.7%)·heater(11118면)·fins/fins_slave(baffle, 각 210230면) — 모두 분리된 patch. checkMesh: 위상 OK, skewness>4 면 1건(경미)만 실패 (2026-08-16)
 
 ### 5-2. 테스트 현황 (43개+, 전부 통과 — 실제 `pytest` 총계는 상단 표 참조)
 
