@@ -69,3 +69,97 @@ def stl_bounds(path):
     lo = tuple(min(p[i] for p in pts) for i in range(3))
     hi = tuple(max(p[i] for p in pts) for i in range(3))
     return lo, hi
+
+
+def rows_y(n, pitch):
+    return [-pitch * (n - 1) / 2 + pitch * i for i in range(n)]
+
+
+def cols_z(n, pitch):
+    return [-pitch * (n - 1) / 2 + pitch * j for j in range(n)]
+
+
+def _cyl_x(f, x0, x1, yc, zc, r, n=40, caps=(True, True)):
+    """x축 원통(중심 yc,zc)을 열린 STL 파일 f에 기록 (측면+양끝 캡 선택).
+
+    caps: (x0에 캡을 씌울지, x1에 캡을 씌울지). 기본값은 양끝 모두 캡.
+    """
+    pts = [(yc + r * math.cos(2 * math.pi * i / n), zc + r * math.sin(2 * math.pi * i / n))
+           for i in range(n)]
+    for i in range(n):
+        y0, z0 = pts[i]
+        y1, z1 = pts[(i + 1) % n]
+        _facet(f, (x0, y0, z0), (x1, y1, z1), (x1, y0, z0))
+        _facet(f, (x0, y0, z0), (x0, y1, z1), (x1, y1, z1))
+        if caps[0]:
+            _facet(f, (x0, yc, zc), (x0, y1, z1), (x0, y0, z0))
+        if caps[1]:
+            _facet(f, (x1, yc, zc), (x1, y0, z0), (x1, y1, z1))
+
+
+def write_tube_bank_stl(path, D_t, ys, zs, x0, x1):
+    with open(path, "w") as f:
+        f.write("solid tubes\n")
+        for yc in ys:
+            for zc in zs:
+                _cyl_x(f, x0, x1, yc, zc, D_t / 2)
+        f.write("endsolid tubes\n")
+
+
+def n_fins(x0, x1, pitch):
+    return int(round((x1 - x0) / pitch)) + 1
+
+
+def write_fins_stl(path, ys, fin_h, fin_z, pitch_x, x0, x1):
+    """각 단(y) 중심에 fin_h(y)×fin_z(z) 사각 핀을 x방향 pitch_x 간격으로. 두께 0."""
+    hz = fin_z / 2.0
+    xs = [x0 + pitch_x * k for k in range(n_fins(x0, x1, pitch_x))]
+    with open(path, "w") as f:
+        f.write("solid fins\n")
+        for xf in xs:
+            for yc in ys:
+                y0, y1 = yc - fin_h / 2, yc + fin_h / 2
+                a = (xf, y0, -hz); b = (xf, y1, -hz)
+                c = (xf, y1, hz); d = (xf, y0, hz)
+                _facet(f, a, b, c)
+                _facet(f, a, c, d)
+        f.write("endsolid fins\n")
+
+
+def heater_total_length(x0, x1, z_pitch):
+    R = z_pitch / 2.0
+    return 2.0 * (x1 - x0) + math.pi * R
+
+
+def _ubend_x(f, xc, yc, R, r, n=40, m=24):
+    """x-z 평면 반원(중심 xc,yc, 반경 R, z=-R→+R, +x로 볼록) 중심선을 따라 반경 r 튜브 스윕."""
+    phis = [(-math.pi / 2) + math.pi * k / m for k in range(m + 1)]
+    rings = []
+    for phi in phis:
+        cx, cz = xc + R * math.cos(phi), R * math.sin(phi)
+        u = (math.cos(phi), 0.0, math.sin(phi))   # 접선에 수직(면내)
+        ring = []
+        for i in range(n):
+            th = 2 * math.pi * i / n
+            ring.append((cx + r * math.cos(th) * u[0],
+                         yc + r * math.sin(th),
+                         cz + r * math.cos(th) * u[2]))
+        rings.append(ring)
+    for k in range(m):
+        for i in range(n):
+            a = rings[k][i]; b = rings[k][(i + 1) % n]
+            c = rings[k + 1][(i + 1) % n]; d = rings[k + 1][i]
+            _facet(f, a, b, c)
+            _facet(f, a, c, d)
+
+
+def write_heater_hairpin_stl(path, D_h, x0, x1, z_pitch, yc):
+    """2열(z=±z_pitch/2) 직관 다리 + 오른쪽(x1) U밴드로 이은 hairpin."""
+    r = D_h / 2.0
+    zc = z_pitch / 2.0
+    with open(path, "w") as f:
+        f.write("solid heater\n")
+        _cyl_x(f, x0, x1, yc, -zc, r, caps=(True, False))     # 다리 1 (x1은 U밴드로 이어짐, 캡 없음)
+        _cyl_x(f, x0, x1, yc, +zc, r, caps=(True, False))     # 다리 2 (x1은 U밴드로 이어짐, 캡 없음)
+        _ubend_x(f, x1, yc, zc, r)        # 오른쪽 U밴드(z=-zc→+zc)
+        f.write("endsolid heater\n")

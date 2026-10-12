@@ -21,6 +21,38 @@ class Heat:
 
 
 @dataclass
+class Evaporator:
+    # 튜브 (SI 단위 m)
+    D_t: float = 0.008
+    n_rows: int = 6            # 단 (y)
+    n_cols: int = 2            # 열 (z)
+    pitch_y: float = 0.030     # 단 피치
+    pitch_z: float = 0.030     # 열 피치
+    tube_len: float = 0.600    # x축 길이
+    # 핀
+    fin_h: float = 0.030       # 높이 y
+    fin_z: float = 0.060       # 깊이 z (두 열 모두 덮음)
+    fin_pitch_x: float = 0.008
+    fin_thickness: float = 0.00015
+    # 히터 (2열 U자 hairpin)
+    heater_gap: float = 0.030          # 최하단 튜브에서 히터까지
+    heater_leg_len: float = 0.600
+    heater_col_pitch: float = 0.030    # 2열 간격
+
+    def validate(self):
+        e = []
+        if self.n_rows < 1 or self.n_cols < 1:
+            e.append(f"n_rows/n_cols must be >=1: {self.n_rows},{self.n_cols}")
+        for name in ("D_t", "pitch_y", "pitch_z", "tube_len", "fin_h", "fin_z",
+                     "fin_pitch_x", "heater_leg_len"):
+            if getattr(self, name) <= 0:
+                e.append(f"{name} must be > 0")
+        if self.fin_thickness >= self.fin_pitch_x:
+            e.append("fin_thickness must be < fin_pitch_x")
+        return e
+
+
+@dataclass
 class Params:
     geometry: Geometry
     heat: Heat

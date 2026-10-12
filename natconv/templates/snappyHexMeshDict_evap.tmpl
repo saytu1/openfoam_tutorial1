@@ -1,0 +1,163 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+| Phase 2A 증발기 (튜브뱅크+핀+히터) - snappyHexMesh                          |
+| 핀은 두께가 얇은 free-standing 판이므로 faceZone+faceType baffle 로 지정   |
+\*---------------------------------------------------------------------------*/
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       dictionary;
+    object      snappyHexMeshDict;
+}
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+castellatedMesh true;
+snap            true;
+addLayers       true;
+
+geometry
+{
+    tubes.stl
+    {
+        type    triSurfaceMesh;
+        name    tubes;
+    }
+
+    fins.stl
+    {
+        type    triSurfaceMesh;
+        name    fins;
+    }
+
+    heater.stl
+    {
+        type    triSurfaceMesh;
+        name    heater;
+    }
+}
+
+castellatedMeshControls
+{
+    maxLocalCells       2000000;
+    maxGlobalCells      5000000;
+    minRefinementCells  10;
+    nCellsBetweenLevels 2;
+    maxLoadUnbalance    0.10;
+    allowFreeStandingZoneFaces true;
+    resolveFeatureAngle 30;
+
+    features
+    (
+        {
+            file    "tubes.eMesh";
+            level   __REFINE_MAX__;
+        }
+        {
+            file    "fins.eMesh";
+            level   __REFINE_MAX__;
+        }
+        {
+            file    "heater.eMesh";
+            level   __REFINE_MAX__;
+        }
+    );
+
+    refinementSurfaces
+    {
+        tubes
+        {
+            level       (__REFINE_MIN__ __REFINE_MAX__);
+            patchInfo   { type wall; }
+        }
+
+        heater
+        {
+            level       (__REFINE_MIN__ __REFINE_MAX__);
+            patchInfo   { type wall; }
+        }
+
+        // 핀은 두께가 없는 얇은 판으로 취급 -> free-standing baffle 면
+        fins
+        {
+            level       (2 2);
+            faceZone    finsZone;
+            faceType    baffle;
+            cellZone    none;
+        }
+    }
+
+    refinementRegions
+    {
+    }
+
+    // 유체 영역 내부(튜브/핀/히터 바깥) 한 점
+    locationInMesh      (__LOC_IN_MESH__);
+}
+
+snapControls
+{
+    nSmoothPatch        3;
+    tolerance           2.0;
+    nSolveIter          50;
+    nRelaxIter          5;
+    nFeatureSnapIter    10;
+    implicitFeatureSnap false;
+    explicitFeatureSnap true;
+    multiRegionFeatureSnap false;
+}
+
+addLayersControls
+{
+    relativeSizes       true;
+    layers
+    {
+        tubes
+        {
+            nSurfaceLayers  __N_LAYERS__;
+        }
+        heater
+        {
+            nSurfaceLayers  __N_LAYERS__;
+        }
+    }
+    expansionRatio      1.2;
+    finalLayerThickness 0.5;
+    minThickness        0.1;
+    nGrow               0;
+    featureAngle        130;
+    slipFeatureAngle    30;
+    nRelaxIter          5;
+    nSmoothSurfaceNormals 1;
+    nSmoothNormals      3;
+    nSmoothThickness    10;
+    maxFaceThicknessRatio 0.5;
+    maxThicknessToMedialRatio 0.3;
+    minMedialAxisAngle  90;
+    nBufferCellsNoExtrude 0;
+    nLayerIter          50;
+}
+
+meshQualityControls
+{
+    #includeEtc "caseDicts/meshQualityDict"
+
+    // 레이어 추가 단계에서 요구되는 키 (etc 기본 dict에는 없음)
+    nSmoothScale    4;
+    errorReduction  0.75;
+
+    relaxed
+    {
+        maxNonOrtho 75;
+    }
+}
+
+writeFlags
+(
+    scalarLevels
+    layerSets
+    layerFields
+);
+
+mergeTolerance  1e-6;
+
+// ************************************************************************* //

@@ -13,9 +13,10 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import streamlit as st
 
-from natconv.params import Geometry, Heat, Params
+from natconv.params import Geometry, Heat, Params, Evaporator
 from natconv.environment import MacGerleroEnv
 from natconv.case_builder import build_case
+from natconv.evaporator_case import build_evaporator_geometry
 from natconv.runner import (run_pipeline, read_state, RunController,
                             latest_processor_time, set_end_time)
 from natconv.logparse import parse_convergence
@@ -98,6 +99,45 @@ with st.sidebar:
         help="정상상태 솔버의 최대 반복(iteration) 횟수. 온도가 수렴하려면 약 1000~1500회 "
              "필요합니다. 작은 값은 동작 확인용(수렴 전).")
 
+    st.header("🧊 증발기")
+    evap_enabled = st.checkbox(
+        "증발기 포함", value=False,
+        help="증발기(튜브 다발 + 핀 + 히터 hairpin) 형상을 함께 생성합니다. "
+             "Phase 2A는 형상·메시 생성까지이며, 증발기와의 결합 해석(솔버)은 Phase 2B에서 다룹니다.")
+    evap = Evaporator()
+    evap_errors = []
+    if evap_enabled:
+        evap.D_t = st.number_input("튜브 외경 D_t [mm]", value=evap.D_t * 1000.0, format="%.2f",
+                                   help="증발기 튜브의 바깥 지름") / 1000.0
+        evap.n_rows = int(st.number_input("튜브 단수 n_rows", value=evap.n_rows, step=1,
+                                          help="연직(y) 방향 튜브 단(row) 개수"))
+        evap.n_cols = int(st.number_input("튜브 열수 n_cols", value=evap.n_cols, step=1,
+                                          help="깊이(z) 방향 튜브 열(column) 개수"))
+        evap.pitch_y = st.number_input("단 피치 pitch_y [mm]", value=evap.pitch_y * 1000.0, format="%.1f",
+                                       help="튜브 단 사이의 연직(y) 간격") / 1000.0
+        evap.pitch_z = st.number_input("열 피치 pitch_z [mm]", value=evap.pitch_z * 1000.0, format="%.1f",
+                                       help="튜브 열 사이의 깊이(z) 간격") / 1000.0
+        evap.tube_len = st.number_input("튜브 길이 tube_len [mm]", value=evap.tube_len * 1000.0, format="%.1f",
+                                        help="튜브의 축방향(x) 길이") / 1000.0
+        evap.fin_h = st.number_input("핀 높이 fin_h [mm]", value=evap.fin_h * 1000.0, format="%.1f",
+                                     help="핀의 연직(y) 방향 높이") / 1000.0
+        evap.fin_z = st.number_input("핀 깊이 fin_z [mm]", value=evap.fin_z * 1000.0, format="%.1f",
+                                     help="핀의 깊이(z) 방향 크기 — 튜브 열 전체를 덮음") / 1000.0
+        evap.fin_pitch_x = st.number_input("핀 피치 fin_pitch_x [mm]", value=evap.fin_pitch_x * 1000.0,
+                                           format="%.2f", help="핀 사이의 축방향(x) 간격") / 1000.0
+        evap.fin_thickness = st.number_input("핀 두께 fin_thickness [mm]", value=evap.fin_thickness * 1000.0,
+                                             format="%.3f", help="핀 한 장의 두께") / 1000.0
+        evap.heater_gap = st.number_input("히터 간격 heater_gap [mm]", value=evap.heater_gap * 1000.0,
+                                          format="%.1f",
+                                          help="최하단 튜브에서 히터까지의 연직 간격") / 1000.0
+        evap.heater_leg_len = st.number_input("히터 다리 길이 heater_leg_len [mm]",
+                                              value=evap.heater_leg_len * 1000.0, format="%.1f",
+                                              help="히터 hairpin 각 다리의 축방향(x) 길이") / 1000.0
+        evap.heater_col_pitch = st.number_input("히터 열 간격 heater_col_pitch [mm]",
+                                                value=evap.heater_col_pitch * 1000.0, format="%.1f",
+                                                help="히터 U자(hairpin) 두 다리 사이의 간격") / 1000.0
+        evap_errors = evap.validate()
+
     st.header("저장")
     if "case_name" not in ss:
         ss.case_name = datetime.now().strftime("run_%Y%m%d_%H%M%S")
@@ -107,7 +147,7 @@ params = Params(geometry=geo, heat=Heat(mode=mode, value=value, emissivity=emiss
                 T_inf=T_inf, enclosure_factor=enclosure_factor,
                 refine_level=refine_level, n_layers=n_layers,
                 n_procs=n_procs, end_time=int(end_time))
-errors = params.validate()
+errors = params.validate() + evap_errors
 if not case_name.strip():
     errors = errors + ["케이스 이름을 입력하세요"]
 
@@ -182,8 +222,9 @@ def _render_tabs(case_dir, params, active):
             st.info("완료 후 표시됩니다.")
         else:
             try:
-                st.image(_fig(case_dir, "structure.png",
-                              lambda p: postprocess.structure_png(case_dir, p)))
+                has_evap_stl = os.path.exists(os.path.join(case_dir, "constant/triSurface/tubes.stl"))
+                genfunc = postprocess.structure_multi_png if has_evap_stl else postprocess.structure_png
+                st.image(_fig(case_dir, "structure.png", lambda p: genfunc(case_dir, p)))
             except Exception:
                 st.info("구조 모델 데이터(STL)가 아직 없습니다.")
 
@@ -259,6 +300,8 @@ if run_clicked:
     if os.path.exists(case_dir):
         shutil.rmtree(case_dir)
     build_case(params, MacGerleroEnv(), case_dir)
+    if evap_enabled:
+        build_evaporator_geometry(evap, case_dir)
     _start(case_dir)
     st.rerun()
 

@@ -7,9 +7,9 @@
 |---|---|
 | 프로젝트 | natconv-studio (자연대류 + 복사 표면온도 해석 GUI) |
 | **현재 버전** | **v1.0.0 — 1차 완성 (Phase 1)** (2026-07-16) |
-| 상태 | 1차 완성 · 다음 단계(증발기 결합 해석) 준비 |
-| 저장소 | `/Users/wooya/claude/openfoam/natconv-studio` (git, branch `main`) |
-| 테스트 | 34 passed |
+| 상태 | 1차 완성(Phase 1) · **Phase 2A(증발기+히터 형상·메시) 완료** |
+| 저장소 | `/Users/wooya/claude/openfoam/natconv-studio` (git, branch `phase2a-evaporator-geometry`) |
+| 테스트 | 49 passed |
 
 ---
 
@@ -46,6 +46,8 @@ OpenFOAM으로 **자연대류 + 복사** 열전달 표면온도 해석을 수행
 | FR-8 | **결과 지표**: 표면 평균/최고온도, 복사 비중, 손계산(Churchill–Chu) 대비 비교 | ✅ 구현 |
 | FR-9 | **UI 편의**: 길이 mm · 온도 °C 입력(코어는 SI 유지), 항목별 마우스오버 설명, 케이스 이름 지정 | ✅ 구현 |
 | FR-10 | 진행 상태 실시간 표시(단계 표시등, 2초 자동 갱신) | ✅ 구현(단, 3-3 제약) |
+| FR-11 | **증발기 입력 섹션**: 사이드바 "🧊 증발기"에서 "증발기 포함" 체크 시 튜브/핀/히터 치수(mm) 입력 → `build_evaporator_geometry`로 STL 생성, 구조 모델 탭이 튜브+핀+히터 다중 STL(`structure_multi_png`)을 렌더 (Phase 2A: 형상·메시까지, 솔버 결합은 2B) | ✅ 구현 |
+| FR-12 | **Phase 2A 메시 생성**: `build_phase2a_case`가 결합 바운딩박스로 밀폐 인클로저(blockMeshDict)·surfaceFeatureExtractDict(3 STL)·snappyHexMeshDict_evap 렌더·createBafflesDict(핀 faceZone→baffle) 작성 → blockMesh→surfaceFeatureExtract→snappyHexMesh→checkMesh 실행 시 tubes/heater(wall)·fins+fins_slave(baffle) 별도 patch, checkMesh 통과(경미한 skewness 경고 1건 제외) | ✅ 구현·실행 검증 |
 
 ### 3-2. 비기능 요구사항 (NFR)
 
@@ -90,11 +92,12 @@ natconv-studio/
 │   ├── params.py               # Params 데이터클래스 = 한 해석의 단일 진실 소스 + 검증
 │   ├── geometry.py             # 원통·평판 STL 생성, STL 면적/바운딩박스
 │   ├── case_builder.py         # Params → 케이스 폴더(도메인 자동 산정, BC 분기)
-│   ├── templates/              # 검증된 dict 템플릿(토큰 치환식)
+│   ├── evaporator_case.py      # Evaporator → 3 STL(튜브/핀/히터) 생성 + build_phase2a_case(메시 dict 일체, Phase 2A)
+│   ├── templates/              # 검증된 dict 템플릿(토큰 치환식, snappyHexMeshDict_evap 포함)
 │   ├── environment.py          # OpenFOAM 실행 추상화(MacGerleroEnv, WSL drop-in 지점)
 │   ├── runner.py               # 파이프라인 오케스트레이션·RunState·취소(RunController)·이어하기
 │   ├── logparse.py             # 솔버 로그 → 수렴 시계열(T 평균/최고, qr)
-│   ├── postprocess.py          # 필드/메시 파싱 → 구조·메시·온도장 그림
+│   ├── postprocess.py          # 필드/메시 파싱 → 구조·메시·온도장 그림 (증발기 다중 STL 포함)
 │   └── energy.py               # Churchill–Chu 손계산 + 에너지 평형
 ├── app/streamlit_app.py        # 얇은 UI: 파라미터 · 실행제어 · 불러오기 · 시각화 탭
 ├── tests/                      # pytest (코어 단위 테스트)
@@ -139,8 +142,11 @@ natconv-studio/
 - [x] 시각화 탭 4종 (구조 · 메쉬 · 온도그래프 · 온도프로파일)
 - [x] UI 단위 mm/°C 전환 + 항목별 tooltip
 - [x] 버그 수정 4건 (4-3 표의 하단 4개 항목)
+- [x] Phase 2A: 증발기 케이스 빌더(`evaporator_case.py`) — 튜브/핀/히터 3 STL 생성 + snappy baffle(핀) 템플릿
+- [x] Phase 2A: GUI 증발기 입력 섹션 + 다중 STL 시각화(`postprocess.structure_multi_png`) (2026-08-16)
+- [x] Phase 2A: 통합 검증 — `build_phase2a_case`로 실제 메시 생성(`cases/p2a`), blockMesh(30.9만 배경셀)→surfaceFeatureExtract→snappyHexMesh(1,628,906셀)→checkMesh 실행. patch: tubes(74794면, 면적 0.1931 m² ≈ 12·πD·L=0.1810 m² 대비 +6.7%)·heater(11118면)·fins/fins_slave(baffle, 각 210230면) — 모두 분리된 patch. checkMesh: 위상 OK, skewness>4 면 1건(경미)만 실패 (2026-08-16)
 
-### 5-2. 테스트 현황 (34개, 전부 통과)
+### 5-2. 테스트 현황 (43개+, 전부 통과 — 실제 `pytest` 총계는 상단 표 참조)
 
 | 테스트 파일 | 개수 | 대상 |
 |---|---:|---|
@@ -149,6 +155,8 @@ natconv-studio/
 | `test_case_builder.py` | 4 | 케이스 생성·BC·토큰 치환 |
 | `test_energy.py` | 2 | 손계산·에너지 평형 |
 | `test_geometry.py` | 2 | STL 생성·면적 |
+| `test_evaporator_geometry.py` | 7 | 튜브 다발 좌표·면적·핀 개수·핀 면적·핀 span·히터 길이·히터 STL 면적 |
+| `test_evaporator_case.py` | 4 | 증발기 케이스 빌더: 3 STL 생성·히터 위치(최하단 튜브보다 아래)·히터 전개길이·`build_phase2a_case` 메시 dict 일체 작성(토큰 치환·baffle/faceZone 설정) |
 | `test_environment.py` | 2 | 실행 래핑·솔버명 |
 | `test_postprocess.py` | 2 | 필드 파서 |
 | `test_templates_present.py` | 2 | 템플릿 존재·품질키 |
