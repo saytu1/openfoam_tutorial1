@@ -7,3 +7,17 @@ venv/
 # 생성 케이스·결과 (대용량)
 cases/
 *.foam
+
+# 로컬 스크래치 / 세션 설정
+.superpowers/
+.claude/
+
+# 환경변수 / 시크릿
+.env
+.env.local
+.env.*.local
+
+# API 키 등 민감 정보
+*.pem
+*.key
+secrets.json
