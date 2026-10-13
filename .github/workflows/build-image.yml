@@ -1,0 +1,53 @@
+# main 푸시 시 amd64 컨테이너 이미지를 빌드해 GHCR에 게시한다.
+#  - GitHub 클라우드 러너(ubuntu-latest) = amd64 → 회사 PC(amd64)용 이미지 생성.
+#  - 결과: ghcr.io/saytu1/openfoam_tutorial1:latest (+ 커밋 SHA 태그)
+# 배포 PC에서 받는 법은 docs/deploy-windows.md 참고.
+name: build-image
+
+on:
+  push:
+    branches: [main]
+    paths:                     # 아래 경로가 바뀔 때만 빌드 (불필요한 빌드 방지)
+      - "natconv/**"
+      - "app/**"
+      - "requirements.txt"
+      - "Containerfile"
+      - ".github/workflows/build-image.yml"
+  workflow_dispatch:           # Actions 탭에서 수동 실행 버튼
+
+jobs:
+  build:
+    runs-on: ubuntu-latest     # amd64
+    permissions:
+      contents: read
+      packages: write          # GHCR 게시 권한
+    steps:
+      - name: 코드 체크아웃
+        uses: actions/checkout@v4
+
+      - name: 이미지 태그 소문자화
+        id: meta
+        run: echo "repo=$(echo '${{ github.repository }}' | tr '[:upper:]' '[:lower:]')" >> "$GITHUB_OUTPUT"
+
+      - name: GHCR 로그인
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Buildx 준비
+        uses: docker/setup-buildx-action@v3
+
+      - name: 이미지 빌드 & 푸시 (amd64)
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: Containerfile
+          platforms: linux/amd64
+          push: true
+          tags: |
+            ghcr.io/${{ steps.meta.outputs.repo }}:latest
+            ghcr.io/${{ steps.meta.outputs.repo }}:${{ github.sha }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max

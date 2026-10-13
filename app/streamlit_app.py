@@ -14,7 +14,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import streamlit as st
 
 from natconv.params import Geometry, Heat, Params, Evaporator
-from natconv.environment import MacGerleroEnv
+from natconv.environment import get_environment
 from natconv.case_builder import build_case
 from natconv.evaporator_case import build_evaporator_geometry
 from natconv.runner import (run_pipeline, read_state, RunController,
@@ -174,7 +174,7 @@ def _start(case_dir, start_index=0):
         except OSError:
             pass
     ctrl = RunController()
-    th = threading.Thread(target=run_pipeline, args=(MacGerleroEnv(), case_dir),
+    th = threading.Thread(target=run_pipeline, args=(get_environment(), case_dir),
                           kwargs={"start_index": start_index, "controller": ctrl}, daemon=True)
     th.start()
     ss.update(ctrl=ctrl, thread=th, case_dir=case_dir,
@@ -299,7 +299,7 @@ if run_clicked:
     case_dir = os.path.join(CASES, case_name.strip())
     if os.path.exists(case_dir):
         shutil.rmtree(case_dir)
-    build_case(params, MacGerleroEnv(), case_dir)
+    build_case(params, get_environment(), case_dir)
     if evap_enabled:
         build_evaporator_geometry(evap, case_dir)
     _start(case_dir)

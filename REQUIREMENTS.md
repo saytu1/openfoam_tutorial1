@@ -6,10 +6,10 @@
 | 항목 | 값 |
 |---|---|
 | 프로젝트 | natconv-studio (자연대류 + 복사 표면온도 해석 GUI) |
-| **현재 버전** | **v1.0.0 — 1차 완성 (Phase 1)** (2026-07-16) |
-| 상태 | 1차 완성(Phase 1) · **Phase 2A(증발기+히터 형상·메시) 완료** |
-| 저장소 | `/Users/wooya/claude/openfoam/natconv-studio` (git, branch `phase2a-evaporator-geometry`) |
-| 테스트 | 49 passed |
+| **현재 버전** | **v1.1.0 — 컨테이너 배포 (2026-10-13)** |
+| 상태 | 1차 완성(Phase 1) · Phase 2A(증발기+히터 형상·메시) 완료 · **컨테이너 배포(GHCR) 구성** |
+| 저장소 | github.com/saytu1/openfoam_tutorial1 (private, branch `main`) |
+| 테스트 | 51 passed |
 
 ---
 
@@ -48,13 +48,14 @@ OpenFOAM으로 **자연대류 + 복사** 열전달 표면온도 해석을 수행
 | FR-10 | 진행 상태 실시간 표시(단계 표시등, 2초 자동 갱신) | ✅ 구현(단, 3-3 제약) |
 | FR-11 | **증발기 입력 섹션**: 사이드바 "🧊 증발기"에서 "증발기 포함" 체크 시 튜브/핀/히터 치수(mm) 입력 → `build_evaporator_geometry`로 STL 생성, 구조 모델 탭이 튜브+핀+히터 다중 STL(`structure_multi_png`)을 렌더 (Phase 2A: 형상·메시까지, 솔버 결합은 2B) | ✅ 구현 |
 | FR-12 | **Phase 2A 메시 생성**: `build_phase2a_case`가 결합 바운딩박스로 밀폐 인클로저(blockMeshDict)·surfaceFeatureExtractDict(3 STL)·snappyHexMeshDict_evap 렌더·createBafflesDict(핀 faceZone→baffle) 작성 → blockMesh→surfaceFeatureExtract→snappyHexMesh→checkMesh 실행 시 tubes/heater(wall)·fins+fins_slave(baffle) 별도 patch, checkMesh 통과(경미한 skewness 경고 1건 제외) | ✅ 구현·실행 검증 |
+| FR-13 | **컨테이너 배포**: 루트 `Containerfile`(gerlero `microfluidica/openfoam:2606` + Python + Streamlit 올인원), `environment.get_environment()`가 `NATCONV_ENV=linux`면 `OpenFOAMLinuxEnv`(ENTRYPOINT가 FOAM 환경 상속 → plain bash 실행) 선택. GitHub Actions(`.github/workflows/build-image.yml`)가 main 푸시 시 amd64 이미지를 빌드해 `ghcr.io/saytu1/openfoam_tutorial1`에 게시. 회사 PC(WSL+Podman)는 pull/run만. | ✅ 구현 |
 
 ### 3-2. 비기능 요구사항 (NFR)
 
 | ID | 요구사항 |
 |---|---|
 | NFR-1 | 코어(`natconv/`)는 **Streamlit 비의존** → pytest로 독립 검증 가능 |
-| NFR-2 | OpenFOAM 실행 방식은 `environment.py` 어댑터로 격리 → Mac/WSL 이식 시 어댑터만 교체 |
+| NFR-2 | OpenFOAM 실행 방식은 `environment.py` 어댑터로 격리 → `get_environment()`가 `NATCONV_ENV`로 Mac(`MacGerleroEnv`)/컨테이너(`OpenFOAMLinuxEnv`) 자동 선택 |
 | NFR-3 | UI는 **논블로킹** — 해석 중에도 중지/조작 가능 |
 | NFR-4 | 검증된 CFD 설정을 코어에 내장하여 사용자가 함정에 빠지지 않게 함 (4-3 참조) |
 
@@ -94,7 +95,7 @@ natconv-studio/
 │   ├── case_builder.py         # Params → 케이스 폴더(도메인 자동 산정, BC 분기)
 │   ├── evaporator_case.py      # Evaporator → 3 STL(튜브/핀/히터) 생성 + build_phase2a_case(메시 dict 일체, Phase 2A)
 │   ├── templates/              # 검증된 dict 템플릿(토큰 치환식, snappyHexMeshDict_evap 포함)
-│   ├── environment.py          # OpenFOAM 실행 추상화(MacGerleroEnv, WSL drop-in 지점)
+│   ├── environment.py          # OpenFOAM 실행 추상화(MacGerleroEnv/OpenFOAMLinuxEnv + get_environment)
 │   ├── runner.py               # 파이프라인 오케스트레이션·RunState·취소(RunController)·이어하기
 │   ├── logparse.py             # 솔버 로그 → 수렴 시계열(T 평균/최고, qr)
 │   ├── postprocess.py          # 필드/메시 파싱 → 구조·메시·온도장 그림 (증발기 다중 STL 포함)
@@ -102,7 +103,13 @@ natconv-studio/
 ├── app/streamlit_app.py        # 얇은 UI: 파라미터 · 실행제어 · 불러오기 · 시각화 탭
 ├── tests/                      # pytest (코어 단위 테스트)
 ├── cases/                      # 실행 결과(케이스별 폴더, git 제외)
-├── docs/superpowers/           # 설계 스펙 · 구현 계획
+├── Containerfile               # 배포 이미지 레시피(OpenFOAM+Python+Streamlit)
+├── .github/workflows/          # build-image.yml: amd64 이미지 빌드→GHCR 게시
+├── docs/
+│   ├── containerization-plan.md  # 컨테이너 전략 배경
+│   ├── deploy-windows.md         # 회사 PC(WSL+Podman) 설치·실행 가이드
+│   └── superpowers/              # 설계 스펙 · 구현 계획
+├── examples/container/         # 컨테이너 설정 예시(초안)
 ├── README.md                   # 설치·실행 안내
 └── REQUIREMENTS.md             # (이 문서) 요구조건·설계·진척·버전
 ```
@@ -186,6 +193,7 @@ natconv-studio/
 
 | 버전 | 날짜 | 내용 | 주요 커밋 |
 |---|---|---|---|
+| **v1.1.0** | 2026-10-13 | **컨테이너 배포** — `OpenFOAMLinuxEnv`+`get_environment()`, 루트 `Containerfile`(gerlero v2606), GitHub Actions amd64 빌드→GHCR, `docs/deploy-windows.md` | (이 커밋) |
 | **v1.0.0** | 2026-07-16 | **1차 완성** — 요구조건·설계·진척·버전 관리 문서화 포함, Phase 1 범위 확정 | `8148f97` |
 | **v0.5.0** | 2026-07-16 | 시각화 탭 4종(구조/메쉬/온도그래프/온도프로파일), 불러오기 UI 메인 상단 이동, 그림 캐시 | `3b27ea9` |
 | v0.4.0 | 2026-07-11 | UI 단위 mm/°C 전환(코어 SI 유지), 항목별 tooltip 설명 | `b5e1238` |

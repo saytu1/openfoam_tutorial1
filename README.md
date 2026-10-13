@@ -28,6 +28,20 @@ python3 -m venv .venv && .venv/bin/pip install -r requirements.txt
 .venv/bin/pytest -q
 ```
 
+## 회사 PC 배포 (Windows + WSL, Docker 없이 Podman)
+
+컨테이너 이미지가 GitHub Actions에서 amd64로 빌드되어 GHCR에 게시됩니다. 회사 PC는
+내려받아 실행만 하면 됩니다.
+
+- **설치·실행 상세 가이드: [`docs/deploy-windows.md`](docs/deploy-windows.md)**
+
+```bash
+# WSL Ubuntu 안에서 (1회 로그인 후)
+podman pull ghcr.io/saytu1/openfoam_tutorial1:latest
+podman run --rm -p 8501:8501 -v "$PWD/cases:/app/cases" ghcr.io/saytu1/openfoam_tutorial1:latest
+# 브라우저: http://localhost:8501
+```
+
 ## 검증 벤치마크
 
 Ø6.5 mm 수평 원통 · 8500 W/m²(0.85 W/cm²) · ε0.95 · 25 °C 를 GUI/코어로 실행하면:
