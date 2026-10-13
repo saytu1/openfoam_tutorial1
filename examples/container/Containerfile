@@ -1,0 +1,37 @@
+# natconv-studio 컨테이너 예시 (초안) — OpenFOAM + Python + Streamlit 올인원
+# ─────────────────────────────────────────────────────────────────────
+# ⚠️ 이 파일은 "예시"입니다. 실제 적용 전 아래를 확인하세요.
+#   1) 베이스 이미지 태그(2606)가 hub.docker.com 에 존재하는지 확인.
+#      없으면 가장 가까운 ESI 버전으로 바꾸거나, ubuntu + openfoam.com apt 방식으로 교체.
+#   2) FOAM_BASHRC 경로는 베이스 이미지마다 다를 수 있음 → 이미지 안에서 `find / -name bashrc` 로 확인.
+#   3) 실제 사용 시 이 파일을 저장소 "루트"로 옮기고 파일명을 Containerfile(또는 Dockerfile)로.
+# 빌드:  podman build -t openfoam_tutorial1 -f examples/container/Containerfile .
+# 실행:  podman run --rm -p 8501:8501 -v "$PWD/cases:/app/cases" openfoam_tutorial1
+# 접속:  브라우저에서 http://localhost:8501
+# ─────────────────────────────────────────────────────────────────────
+
+# 1) 베이스: 리눅스 OpenFOAM (Mac 네이티브 v2606과 "같은 버전"으로 맞춤)
+FROM opencfd/openfoam-default:2606
+
+# 2) 파이썬 + 앱 의존성 설치
+USER root
+RUN apt-get update \
+ && apt-get install -y --no-install-recommends python3 python3-pip \
+ && rm -rf /var/lib/apt/lists/*
+
+# 3) 앱 복사 + 파이썬 패키지 설치
+WORKDIR /app
+COPY requirements.txt .
+RUN pip3 install --no-cache-dir -r requirements.txt
+COPY natconv/ ./natconv/
+COPY app/ ./app/
+
+# 4) 앱이 "리눅스(컨테이너) 환경"을 쓰도록 지정
+#    (코어 environment.get_environment() 가 NATCONV_ENV=linux 이면 OpenFOAMLinuxEnv 선택)
+ENV NATCONV_ENV=linux
+#    OpenFOAM 환경 로드 스크립트 경로 (베이스 이미지에 맞게 조정)
+ENV FOAM_BASHRC=/openfoam/bashrc
+
+# 5) Streamlit 포트 + 실행 (외부 접속 허용 0.0.0.0)
+EXPOSE 8501
+CMD ["bash", "-lc", "source $FOAM_BASHRC && streamlit run app/streamlit_app.py --server.address 0.0.0.0 --server.port 8501"]
