@@ -13,10 +13,10 @@
 # ─────────────────────────────────────────────────────────────────────
 FROM microfluidica/openfoam:2606
 
-# 베이스는 Ubuntu 24.04 → python3/pip 설치. (루트 사용자로 설치)
+# 베이스는 Ubuntu 24.04 → python3/pip + 한글 폰트(그래프 라벨용) 설치. (루트 사용자)
 USER root
 RUN apt-get update \
- && apt-get install -y --no-install-recommends python3 python3-pip \
+ && apt-get install -y --no-install-recommends python3 python3-pip fonts-nanum \
  && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
@@ -36,5 +36,6 @@ ENV NATCONV_ENV=linux
 EXPOSE 8501
 
 # ENTRYPOINT(/openfoam/run)가 FOAM 환경을 로드한 뒤 아래 CMD를 실행한다.
-CMD ["streamlit", "run", "app/streamlit_app.py", \
+# streamlit 콘솔 스크립트 대신 `python3 -m streamlit` 사용(기동 시 bash 오해석 노이즈 방지).
+CMD ["python3", "-m", "streamlit", "run", "app/streamlit_app.py", \
      "--server.address", "0.0.0.0", "--server.port", "8501"]

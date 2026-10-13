@@ -12,9 +12,11 @@ from mpl_toolkits.mplot3d.art3d import Poly3DCollection
 
 from .geometry import stl_bounds
 
-# 한글 폰트 (macOS)
+# 한글 폰트 (macOS / Linux 컨테이너)
 for _cand in ["/System/Library/Fonts/Supplemental/AppleGothic.ttf",
-              "/System/Library/Fonts/AppleSDGothicNeo.ttc"]:
+              "/System/Library/Fonts/AppleSDGothicNeo.ttc",
+              "/usr/share/fonts/truetype/nanum/NanumGothic.ttf",
+              "/usr/share/fonts/truetype/nanum/NanumBarunGothic.ttf"]:
     if os.path.exists(_cand):
         try:
             font_manager.fontManager.addfont(_cand)

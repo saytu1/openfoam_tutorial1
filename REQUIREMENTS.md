@@ -6,7 +6,7 @@
 | 항목 | 값 |
 |---|---|
 | 프로젝트 | natconv-studio (자연대류 + 복사 표면온도 해석 GUI) |
-| **현재 버전** | **v1.2.0 — 병렬 코어/분할 수 관리 UI (2026-10-13)** |
+| **현재 버전** | **v1.2.1 — 컨테이너 한글폰트·기동 노이즈 수정 (2026-10-13)** |
 | 상태 | 1차 완성(Phase 1) · Phase 2A(증발기+히터 형상·메시) 완료 · 컨테이너 배포(GHCR) · **코어/분할 수 GUI 관리** |
 | 저장소 | github.com/saytu1/openfoam_tutorial1 (private, branch `main`) |
 | 테스트 | 51 passed |
@@ -194,6 +194,7 @@ natconv-studio/
 
 | 버전 | 날짜 | 내용 | 주요 커밋 |
 |---|---|---|---|
+| **v1.2.1** | 2026-10-13 | **컨테이너 수정** — 한글 폰트(fonts-nanum) 설치로 그래프 한글 깨짐 해결, CMD를 `python3 -m streamlit`로 변경해 기동 시 bash 오해석 노이즈 제거 | (이 커밋) |
 | **v1.2.0** | 2026-10-13 | **병렬 코어/분할 수 관리 UI** — 가용 코어 vs 분할 수 표시·불일치 경고, '코어 수에 맞추기' 버튼, VM 코어 증설 가이드(Podman/WSL) 내장 | (이 커밋) |
 | **v1.1.0** | 2026-10-13 | **컨테이너 배포** — `OpenFOAMLinuxEnv`+`get_environment()`, 루트 `Containerfile`(gerlero v2606), GitHub Actions amd64 빌드→GHCR, `docs/deploy-windows.md` | (이 커밋) |
 | **v1.0.0** | 2026-07-16 | **1차 완성** — 요구조건·설계·진척·버전 관리 문서화 포함, Phase 1 범위 확정 | `8148f97` |
