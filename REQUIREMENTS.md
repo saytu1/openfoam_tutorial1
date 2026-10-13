@@ -6,8 +6,8 @@
 | 항목 | 값 |
 |---|---|
 | 프로젝트 | natconv-studio (자연대류 + 복사 표면온도 해석 GUI) |
-| **현재 버전** | **v1.1.0 — 컨테이너 배포 (2026-10-13)** |
-| 상태 | 1차 완성(Phase 1) · Phase 2A(증발기+히터 형상·메시) 완료 · **컨테이너 배포(GHCR) 구성** |
+| **현재 버전** | **v1.2.0 — 병렬 코어/분할 수 관리 UI (2026-10-13)** |
+| 상태 | 1차 완성(Phase 1) · Phase 2A(증발기+히터 형상·메시) 완료 · 컨테이너 배포(GHCR) · **코어/분할 수 GUI 관리** |
 | 저장소 | github.com/saytu1/openfoam_tutorial1 (private, branch `main`) |
 | 테스트 | 51 passed |
 
@@ -48,7 +48,8 @@ OpenFOAM으로 **자연대류 + 복사** 열전달 표면온도 해석을 수행
 | FR-10 | 진행 상태 실시간 표시(단계 표시등, 2초 자동 갱신) | ✅ 구현(단, 3-3 제약) |
 | FR-11 | **증발기 입력 섹션**: 사이드바 "🧊 증발기"에서 "증발기 포함" 체크 시 튜브/핀/히터 치수(mm) 입력 → `build_evaporator_geometry`로 STL 생성, 구조 모델 탭이 튜브+핀+히터 다중 STL(`structure_multi_png`)을 렌더 (Phase 2A: 형상·메시까지, 솔버 결합은 2B) | ✅ 구현 |
 | FR-12 | **Phase 2A 메시 생성**: `build_phase2a_case`가 결합 바운딩박스로 밀폐 인클로저(blockMeshDict)·surfaceFeatureExtractDict(3 STL)·snappyHexMeshDict_evap 렌더·createBafflesDict(핀 faceZone→baffle) 작성 → blockMesh→surfaceFeatureExtract→snappyHexMesh→checkMesh 실행 시 tubes/heater(wall)·fins+fins_slave(baffle) 별도 patch, checkMesh 통과(경미한 skewness 경고 1건 제외) | ✅ 구현·실행 검증 |
-| FR-13 | **컨테이너 배포**: 루트 `Containerfile`(gerlero `microfluidica/openfoam:2606` + Python + Streamlit 올인원), `environment.get_environment()`가 `NATCONV_ENV=linux`면 `OpenFOAMLinuxEnv`(ENTRYPOINT가 FOAM 환경 상속 → plain bash 실행) 선택. GitHub Actions(`.github/workflows/build-image.yml`)가 main 푸시 시 amd64 이미지를 빌드해 `ghcr.io/saytu1/openfoam_tutorial1`에 게시. 회사 PC(WSL+Podman)는 pull/run만. | ✅ 구현 |
+| FR-13 | **컨테이너 배포**: 루트 `Containerfile`(gerlero `microfluidica/openfoam:2606` + Python + Streamlit 올인원), `environment.get_environment()`가 `NATCONV_ENV=linux`면 `OpenFOAMLinuxEnv`(ENTRYPOINT가 FOAM 환경 상속 → plain bash 실행) 선택. GitHub Actions(`.github/workflows/build-image.yml`)가 main 푸시 시 amd64 이미지를 빌드해 `ghcr.io/saytu1/openfoam_tutorial1`에 게시. 회사 PC(WSL+Podman)는 pull/run만. 런타임 검증 완료(Mac arm64). | ✅ 구현·검증 |
+| FR-14 | **병렬 코어/분할 수 관리 UI**: 사이드바에 가용 코어 수(`os.cpu_count()`, 컨테이너면 VM 코어)와 케이스 분할 수(n_procs)를 메트릭으로 표시, 분할>코어면 MPI 실패(prte alloc-error) 경고. "↔ 분할 수를 코어 수에 맞추기" 버튼으로 n_procs=가용코어 자동 설정. VM 코어 증설 명령 가이드(Podman `machine set --cpus`, WSL2 `.wslconfig processors=`)를 익스팬더로 내장(컨테이너 내부에선 VM 변경 불가하므로 호스트 실행 안내). | ✅ 구현·검증 |
 
 ### 3-2. 비기능 요구사항 (NFR)
 
@@ -193,6 +194,7 @@ natconv-studio/
 
 | 버전 | 날짜 | 내용 | 주요 커밋 |
 |---|---|---|---|
+| **v1.2.0** | 2026-10-13 | **병렬 코어/분할 수 관리 UI** — 가용 코어 vs 분할 수 표시·불일치 경고, '코어 수에 맞추기' 버튼, VM 코어 증설 가이드(Podman/WSL) 내장 | (이 커밋) |
 | **v1.1.0** | 2026-10-13 | **컨테이너 배포** — `OpenFOAMLinuxEnv`+`get_environment()`, 루트 `Containerfile`(gerlero v2606), GitHub Actions amd64 빌드→GHCR, `docs/deploy-windows.md` | (이 커밋) |
 | **v1.0.0** | 2026-07-16 | **1차 완성** — 요구조건·설계·진척·버전 관리 문서화 포함, Phase 1 범위 확정 | `8148f97` |
 | **v0.5.0** | 2026-07-16 | 시각화 탭 4종(구조/메쉬/온도그래프/온도프로파일), 불러오기 UI 메인 상단 이동, 그림 캐시 | `3b27ea9` |

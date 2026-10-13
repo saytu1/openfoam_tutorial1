@@ -91,9 +91,42 @@ with st.sidebar:
         "프리즘 레이어 층수", 3, 7, 5,
         help="히터 표면에 붙이는 얇은 경계층 격자 층 수. 벽 근처 급격한 온도변화(열경계층)를 "
              "잘 잡아 표면온도 정확도를 높입니다. 5 권장.")
+    # ── 병렬 실행(코어 수 ↔ 케이스 분할 수) ───────────────────────
+    _avail = os.cpu_count() or 1
+    _in_container = os.environ.get("NATCONV_ENV", "").strip().lower() == "linux"
+    _where = "컨테이너 VM" if _in_container else "이 컴퓨터"
+    _smax = max(_avail, 10)
+    if "n_procs" not in st.session_state:
+        st.session_state["n_procs"] = min(6, _smax)
+
+    def _match_cores():
+        st.session_state["n_procs"] = _avail
+
+    st.button("↔ 분할 수를 코어 수에 맞추기", on_click=_match_cores,
+              help="케이스 분할 수를 가용 코어 수로 맞춰 MPI 실행 실패(분할>코어)를 예방합니다.")
     n_procs = st.slider(
-        "병렬 코어 수", 1, 10, 6,
-        help="해석을 몇 개의 CPU 코어로 나눠 동시에 계산할지. 코어가 많을수록 빠릅니다.")
+        "병렬 코어 수(= 케이스 분할 수)", 1, _smax, key="n_procs",
+        help="해석을 몇 개의 CPU 코어로 나눠 동시에 계산할지. 코어가 많을수록 빠릅니다. "
+             "이 값이 '가용 코어 수'보다 크면 MPI(mpirun)가 실행을 거부합니다.")
+    _c1, _c2 = st.columns(2)
+    _c1.metric(f"가용 코어 ({_where})", _avail)
+    _c2.metric("케이스 분할 수", n_procs)
+    if n_procs > _avail:
+        st.warning(f"⚠️ 분할 수({n_procs}) > 가용 코어({_avail}) → 솔버(MPI) 실행이 "
+                   f"실패합니다(prte alloc-error). 위 '맞추기' 버튼을 누르거나 분할 수를 "
+                   f"{_avail} 이하로 낮추세요.")
+    else:
+        st.caption(f"✅ 분할 수 {n_procs} ≤ 가용 코어 {_avail} — 병렬 실행 가능")
+    with st.expander("ℹ️ 가용 코어(VM) 수를 늘리려면 — 호스트에서 실행"):
+        st.markdown(
+            "컨테이너 안에서는 VM 코어 수를 바꿀 수 없습니다. "
+            "**호스트(컨테이너 바깥) 터미널**에서 아래를 실행하세요.\n\n"
+            "**Mac / Windows (Podman):**\n"
+            "```\npodman machine stop\npodman machine set --cpus 8\npodman machine start\n```\n"
+            "**회사 PC (WSL2):** `C:\\Users\\<사용자>\\.wslconfig` 에 추가 후 "
+            "`wsl --shutdown` 으로 재시작:\n"
+            "```\n[wsl2]\nprocessors=8\n```\n"
+            "변경 후 분할 수를 그 코어 수 이하로 두면 됩니다.")
     end_time = st.number_input(
         "최대 반복(endTime)", value=1500, step=100,
         help="정상상태 솔버의 최대 반복(iteration) 횟수. 온도가 수렴하려면 약 1000~1500회 "
