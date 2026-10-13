@@ -117,16 +117,18 @@ with st.sidebar:
                    f"{_avail} 이하로 낮추세요.")
     else:
         st.caption(f"✅ 분할 수 {n_procs} ≤ 가용 코어 {_avail} — 병렬 실행 가능")
-    with st.expander("ℹ️ 가용 코어(VM) 수를 늘리려면 — 호스트에서 실행"):
+    with st.expander("ℹ️ VM 코어·메모리를 늘리려면 — 호스트에서 실행"):
         st.markdown(
-            "컨테이너 안에서는 VM 코어 수를 바꿀 수 없습니다. "
-            "**호스트(컨테이너 바깥) 터미널**에서 아래를 실행하세요.\n\n"
-            "**Mac / Windows (Podman):**\n"
-            "```\npodman machine stop\npodman machine set --cpus 8\npodman machine start\n```\n"
+            "컨테이너 안에서는 VM 자원을 바꿀 수 없습니다. "
+            "**호스트(컨테이너 바깥) 터미널**에서 아래를 실행하세요. "
+            "(코어 부족 → MPI alloc-error, 메모리 부족 → 솔버 OOM 강제종료)\n\n"
+            "**Mac / Windows (Podman)** — 코어·메모리 함께 설정(예: 6코어·8GB):\n"
+            "```\npodman machine stop\npodman machine set --cpus 6 --memory 8192\npodman machine start\n```\n"
+            "`--memory` 단위는 MiB (8192 = 8GB). 코어만/메모리만 따로 바꿔도 됩니다.\n\n"
             "**회사 PC (WSL2):** `C:\\Users\\<사용자>\\.wslconfig` 에 추가 후 "
             "`wsl --shutdown` 으로 재시작:\n"
-            "```\n[wsl2]\nprocessors=8\n```\n"
-            "변경 후 분할 수를 그 코어 수 이하로 두면 됩니다.")
+            "```\n[wsl2]\nprocessors=6\nmemory=8GB\n```\n"
+            "변경 후 분할 수를 코어 수 이하로 두고, 큰 복사 해석은 메모리를 넉넉히 두세요.")
     end_time = st.number_input(
         "최대 반복(endTime)", value=1500, step=100,
         help="정상상태 솔버의 최대 반복(iteration) 횟수. 온도가 수렴하려면 약 1000~1500회 "
